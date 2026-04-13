@@ -372,6 +372,7 @@ function PlayersContent() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [activeGrade, setActiveGrade] = useState<'전체' | '3학년'>('전체');
   const [search, setSearch] = useState('');
   const [activePos, setActivePos] = useState('전체');
@@ -439,6 +440,7 @@ function PlayersContent() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setSaveError(null);
     try {
       const positions = form.positions.length ? form.positions : ['FW' as PosKey];
       const playerId = editMode && selected ? selected.id : String(Date.now());
@@ -495,9 +497,10 @@ function PlayersContent() {
         setPlayers(prev => [...prev, updatedPlayer]);
         closeModal();
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Save failed:', err);
-      alert('저장에 실패했습니다. 다시 시도해 주세요.');
+      const msg = err instanceof Error ? err.message : String(err);
+      setSaveError('저장 실패: ' + msg);
     } finally {
       setSaving(false);
     }
@@ -800,6 +803,12 @@ function PlayersContent() {
                     {saving ? '저장 중...' : addMode ? '등록 완료' : '수정 완료'}
                   </button>
                 </div>
+                {saveError && (
+                  <div className="mt-3 px-3 py-2.5 rounded-sm text-xs text-red-400 break-all"
+                    style={{ background: 'rgba(204,0,0,0.12)', border: '1px solid rgba(204,0,0,0.3)' }}>
+                    ⚠ {saveError}
+                  </div>
+                )}
               </form>
             )}
           </div>
