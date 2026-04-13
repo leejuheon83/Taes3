@@ -104,14 +104,6 @@ export default function Home() {
               끝까지 해내는 아이로 자라는 과정,<br />
               그것이 바로 태즈가 말하는 성장입니다.
             </p>
-            <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-              <Link href="/register" className="font-bold px-8 py-3.5 transition-colors text-white" style={{ backgroundColor: '#CC0000' }}>
-                선수 등록 →
-              </Link>
-              <Link href="/schedule" className="border border-white/30 text-white font-bold px-8 py-3.5 transition-colors hover:text-white" style={{ borderColor: 'rgba(255,255,255,0.3)' }}>
-                경기 일정
-              </Link>
-            </div>
           </div>
 
           {/* 킥 인트로 애니메이션 */}
