@@ -23,18 +23,6 @@ type Match = {
 
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
-const defaultMatches: Omit<Match, 'id'>[] = [
-  { date: '2025-04-12', day: '토', time: '10:00', home: 'TAES FC', away: '드래곤 FC', venue: '○○구장 1경기장', grade: '3학년', result: null, homeScore: null, awayScore: null },
-  { date: '2025-04-12', day: '토', time: '14:00', home: 'TAES FC', away: '블루 스타', venue: '○○구장 2경기장', grade: '1학년', result: null, homeScore: null, awayScore: null },
-  { date: '2025-04-19', day: '토', time: '10:00', home: 'TAES FC', away: '스타 유나이티드', venue: '△△구장', grade: '1학년', result: null, homeScore: null, awayScore: null },
-  { date: '2025-04-26', day: '일', time: '11:00', home: '블루 FC', away: 'TAES FC', venue: '□□구장', grade: '3학년', result: null, homeScore: null, awayScore: null },
-  { date: '2025-05-03', day: '토', time: '10:00', home: 'TAES FC', away: '그린 유스', venue: '○○구장 1경기장', grade: '1학년', result: null, homeScore: null, awayScore: null },
-  { date: '2025-03-29', day: '토', time: '10:00', home: 'TAES FC', away: '레드 스타', venue: '○○구장', grade: '3학년', result: '승', homeScore: 3, awayScore: 1 },
-  { date: '2025-03-22', day: '토', time: '14:00', home: '그린 FC', away: 'TAES FC', venue: '△△구장', grade: '1학년', result: '승', homeScore: 1, awayScore: 2 },
-  { date: '2025-03-15', day: '토', time: '10:00', home: 'TAES FC', away: '화이트 유나이티드', venue: '○○구장', grade: '3학년', result: '무', homeScore: 1, awayScore: 1 },
-  { date: '2025-03-08', day: '토', time: '11:00', home: '블랙 FC', away: 'TAES FC', venue: '□□구장', grade: '3학년', result: '패', homeScore: 2, awayScore: 0 },
-  { date: '2025-03-01', day: '토', time: '10:00', home: 'TAES FC', away: '오렌지 FC', venue: '○○구장', grade: '1학년', result: '승', homeScore: 4, awayScore: 2 },
-];
 
 const emptyForm = {
   date: '',
@@ -73,22 +61,11 @@ export default function SchedulePage() {
       try {
         const q = query(collection(db, 'matches'), orderBy('date', 'desc'));
         const snap = await getDocs(q);
-        if (snap.empty) {
-          // Seed default matches
-          const seeded: Match[] = [];
-          for (const m of defaultMatches) {
-            const id = String(Date.now() + Math.random());
-            await setDoc(doc(db, 'matches', id), m);
-            seeded.push({ id, ...m });
-          }
-          setMatches(seeded);
-        } else {
-          const loaded: Match[] = snap.docs.map(d => ({
-            id: d.id,
-            ...(d.data() as Omit<Match, 'id'>),
-          }));
-          setMatches(loaded);
-        }
+        const loaded: Match[] = snap.docs.map(d => ({
+          id: d.id,
+          ...(d.data() as Omit<Match, 'id'>),
+        }));
+        setMatches(loaded);
       } catch (err) {
         console.error('Failed to load matches:', err);
       } finally {
