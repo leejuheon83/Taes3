@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 
-const ADMIN_PASSWORD = '0000';
+const ADMIN_PASSWORD = '3333';
 const SESSION_KEY = 'taes-admin-auth';
 
 export function isAdmin(): boolean {
