@@ -3,11 +3,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { useRouter } from 'next/navigation';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import {
   collection, getDocs, doc, setDoc, deleteDoc, getDoc, orderBy, query
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const USER_AUTH_KEY = 'taes-user-login';
 
@@ -127,14 +126,6 @@ export default function VideosPage() {
   async function handleDelete(id: string) {
     if (!confirm('영상을 삭제할까요?')) return;
     try {
-      const meta = metas.find(m => m.id === id);
-      // Delete from storage if uploaded video
-      if (meta?.type === 'upload') {
-        try {
-          const sRef = storageRef(storage, `videos/${id}`);
-          await deleteObject(sRef);
-        } catch { /* ignore */ }
-      }
       await deleteDoc(doc(db, 'videos', id));
       setMetas(prev => prev.filter(m => m.id !== id));
       if (playingId === id) handleClosePlayer();
@@ -191,10 +182,13 @@ export default function VideosPage() {
       } else {
         if (!videoFile) { alert('영상 파일을 선택해 주세요.'); setUploading(false); return; }
         const id = String(Date.now());
-        // Upload to Firebase Storage
-        const sRef = storageRef(storage, `videos/${id}`);
-        await uploadBytes(sRef, videoFile);
-        const storageURL = await getDownloadURL(sRef);
+        // Convert video to base64 and store directly in Firestore
+        const storageURL = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(videoFile);
+        });
         const meta: VideoMeta = {
           id,
           title: form.title.trim(),

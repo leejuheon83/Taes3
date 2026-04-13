@@ -3,11 +3,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { useRouter } from 'next/navigation';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import {
   collection, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, orderBy, query
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const USER_AUTH_KEY = 'taes-user-login';
 
@@ -117,16 +116,6 @@ export default function GalleryPage() {
   async function handleDeleteAlbum(id: string) {
     if (!confirm('앨범을 삭제하면 사진·영상도 모두 삭제됩니다. 계속할까요?')) return;
     try {
-      const album = albums.find(a => a.id === id);
-      if (album) {
-        // Delete all photos from storage
-        for (const item of album.items) {
-          try {
-            const sRef = storageRef(storage, `gallery/${id}/${item.id}.jpg`);
-            await deleteObject(sRef);
-          } catch { /* ignore */ }
-        }
-      }
       await deleteDoc(doc(db, 'albums', id));
       setAlbums(prev => prev.filter(a => a.id !== id));
       if (openAlbum?.id === id) setOpenAlbum(null);
@@ -160,13 +149,8 @@ export default function GalleryPage() {
       const newItems: MediaItem[] = [];
       for (const preview of uploadPreviews) {
         const itemId = String(Date.now() + Math.random());
-        // Upload to Firebase Storage
-        const response = await fetch(preview.dataUrl);
-        const blob = await response.blob();
-        const sRef = storageRef(storage, `gallery/${uploadAlbumId}/${itemId}.jpg`);
-        await uploadBytes(sRef, blob);
-        const url = await getDownloadURL(sRef);
-        newItems.push({ id: itemId, url, name: preview.name, type: 'photo' });
+        // Store base64 dataURL directly in Firestore
+        newItems.push({ id: itemId, url: preview.dataUrl, name: preview.name, type: 'photo' });
       }
 
       const updatedItems = [...album.items, ...newItems];
@@ -191,12 +175,6 @@ export default function GalleryPage() {
     const album = albums.find(a => a.id === albumId);
     if (!album) return;
     try {
-      // Delete from storage
-      try {
-        const sRef = storageRef(storage, `gallery/${albumId}/${itemId}.jpg`);
-        await deleteObject(sRef);
-      } catch { /* ignore */ }
-
       const updatedItems = album.items.filter(p => p.id !== itemId);
       await updateDoc(doc(db, 'albums', albumId), { items: updatedItems });
       setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, items: updatedItems } : a));
@@ -233,12 +211,8 @@ export default function GalleryPage() {
       const newItems: MediaItem[] = [];
       for (const preview of previews) {
         const itemId = String(Date.now() + Math.random());
-        const response = await fetch(preview.dataUrl);
-        const blob = await response.blob();
-        const sRef = storageRef(storage, `gallery/${openAlbum.id}/${itemId}.jpg`);
-        await uploadBytes(sRef, blob);
-        const url = await getDownloadURL(sRef);
-        newItems.push({ id: itemId, url, name: preview.name, type: 'photo' });
+        // Store base64 dataURL directly in Firestore
+        newItems.push({ id: itemId, url: preview.dataUrl, name: preview.name, type: 'photo' });
       }
 
       const updatedItems = [...openAlbum.items, ...newItems];

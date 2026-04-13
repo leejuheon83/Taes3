@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import {
   collection, getDocs, doc, setDoc, deleteDoc, orderBy, query
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // ── 이미지 압축 (canvas 리사이즈 후 JPEG 변환) ──
 function compressImage(file: File, maxDim = 600, quality = 0.8): Promise<string> {
@@ -318,20 +317,6 @@ function playerToForm(p: Player): FormState {
   };
 }
 
-async function uploadPlayerImage(dataUrl: string, playerId: string, filename: string): Promise<string> {
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
-  const sRef = storageRef(storage, `players/${playerId}/${filename}`);
-  await uploadBytes(sRef, blob);
-  return getDownloadURL(sRef);
-}
-
-async function deletePlayerImage(playerId: string, filename: string) {
-  try {
-    const sRef = storageRef(storage, `players/${playerId}/${filename}`);
-    await deleteObject(sRef);
-  } catch { /* ignore */ }
-}
 
 const iCls = "w-full px-3 py-2 bg-[#0e0e0e] border border-white/10 text-white text-sm focus:border-red-700 outline-none";
 const sCls = "w-full px-3 py-2 bg-[#0e0e0e] border border-white/10 text-white text-sm focus:border-red-700 outline-none";
@@ -445,22 +430,18 @@ function PlayersContent() {
       const positions = form.positions.length ? form.positions : ['FW' as PosKey];
       const playerId = editMode && selected ? selected.id : String(Date.now());
 
-      // Upload photos if they are local dataURLs
+      // Store base64 dataURL directly in Firestore
       let photoURL: string | null = null;
       let modelPhotoURL: string | null = null;
 
-      if (form.photo && form.photo.startsWith('data:')) {
-        photoURL = await uploadPlayerImage(form.photo, playerId, 'photo.jpg');
-      } else if (form.photo) {
-        photoURL = form.photo; // already a URL
+      if (form.photo) {
+        photoURL = form.photo; // base64 dataURL or existing value
       } else if (editMode && selected) {
         photoURL = selected.photoURL ?? null;
       }
 
-      if (form.modelPhoto && form.modelPhoto.startsWith('data:')) {
-        modelPhotoURL = await uploadPlayerImage(form.modelPhoto, playerId, 'modelPhoto.png');
-      } else if (form.modelPhoto) {
-        modelPhotoURL = form.modelPhoto; // already a URL
+      if (form.modelPhoto) {
+        modelPhotoURL = form.modelPhoto; // base64 dataURL or existing value
       } else if (editMode && selected) {
         modelPhotoURL = selected.modelPhotoURL ?? null;
       }
@@ -511,9 +492,6 @@ function PlayersContent() {
     setSaving(true);
     try {
       await deleteDoc(doc(db, 'players', deleteTarget.id));
-      // Delete storage images
-      if (deleteTarget.photoURL) await deletePlayerImage(deleteTarget.id, 'photo.jpg');
-      if (deleteTarget.modelPhotoURL) await deletePlayerImage(deleteTarget.id, 'modelPhoto.png');
       setPlayers(prev => prev.filter(p => p.id !== deleteTarget.id));
       closeModal();
     } catch (err) {

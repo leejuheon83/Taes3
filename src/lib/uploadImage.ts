@@ -1,17 +1,12 @@
-import { storage } from './firebase';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+// Firebase Storage is no longer used.
+// Images are stored as base64 dataURL strings directly in Firestore.
+// This file is kept as a placeholder in case it is imported elsewhere.
 
-export async function uploadImageToStorage(dataUrl: string, path: string): Promise<string> {
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
-  const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, blob);
-  return getDownloadURL(storageRef);
+export async function uploadImageToStorage(_dataUrl: string, _path: string): Promise<string> {
+  // No-op: return the dataURL directly
+  return _dataUrl;
 }
 
-export async function deleteImageFromStorage(url: string) {
-  try {
-    const storageRef = ref(storage, url);
-    await deleteObject(storageRef);
-  } catch { /* ignore */ }
+export async function deleteImageFromStorage(_url: string) {
+  // No-op: nothing to delete from storage
 }
