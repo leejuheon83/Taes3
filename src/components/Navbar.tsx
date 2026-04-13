@@ -28,7 +28,6 @@ const navItems = [
     ],
   },
   { label: '공지사항', href: '/notice' },
-  { label: '선수등록', href: '/register' },
 ];
 
 const NOTICE_KEY = 'taes-notices-v1';
