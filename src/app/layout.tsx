@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
   title: "TAES FC PREMIER | 태즈 FC 프리미어",
@@ -16,12 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className="h-full">
-      <body className="min-h-full flex flex-col bg-[#0a0a0a] text-white antialiased">
+      <body className="min-h-full flex flex-col text-white antialiased" style={{ backgroundColor: '#080808' }}>
         <Navbar />
         <main className="flex-1 pt-[88px]">
           {children}
         </main>
-        <Footer />
       </body>
     </html>
   );

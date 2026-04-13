@@ -65,14 +65,6 @@ export default function Footer() {
                 <span>서울특별시 ○○구<br />○○축구장</span>
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-[#CC0000]">📞</span>
-                <span>010-0000-0000</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-[#CC0000]">✉</span>
-                <span>taes@example.com</span>
-              </li>
-              <li className="flex items-center gap-2">
                 <span className="text-[#CC0000]">⏰</span>
                 <span>훈련: 주중 저녁, 주말 오전</span>
               </li>

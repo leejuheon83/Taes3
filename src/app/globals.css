@@ -3,9 +3,9 @@
 :root {
   --taes-red: #CC0000;
   --taes-dark-red: #990000;
-  --taes-black: #0a0a0a;
-  --taes-dark: #111111;
-  --taes-gray: #1e1e1e;
+  --taes-black: #050505;
+  --taes-dark: #080808;
+  --taes-gray: #0e0e0e;
 }
 
 * { box-sizing: border-box; }
@@ -17,8 +17,10 @@ body {
   font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* 스크롤바 */
+
 .hero-gradient {
-  background: linear-gradient(135deg, #0a0a0a 0%, #1a0000 50%, #0a0a0a 100%);
+  background: linear-gradient(135deg, #050505 0%, #120000 40%, #050505 100%);
 }
 
 .card-hover {
@@ -46,23 +48,273 @@ body {
   margin-top: 8px;
 }
 
+/* ── 킥 애니메이션 시퀀스 ── */
+
+/* 1. 소년 등장 → 킥 → 퇴장 */
+@keyframes hero-boy-enter {
+  0%   { opacity: 0; transform: translateX(-20px); }
+  10%  { opacity: 1; transform: translateX(0); }
+  18%  { transform: translateX(0) rotate(-8deg); }   /* 킥 준비 */
+  38%  { transform: translateX(0) rotate(6deg);  }   /* 킥! */
+  52%  { transform: translateX(0) rotate(0deg);  }
+  75%  { opacity: 0.6; }
+  100% { opacity: 0; transform: translateX(-15px); }
+}
+
+/* 2. 공 날아감 */
+@keyframes hero-ball-fly {
+  0%   { transform: translate(-108px, 44px) scale(0.5); opacity: 0; }
+  7%   { opacity: 1; }
+  45%  { transform: translate(-42px, 6px) scale(0.82); }
+  92%  { opacity: 1; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0; }
+}
+@keyframes hero-ball-spin {
+  from { transform: rotate(0deg);   }
+  to   { transform: rotate(-540deg); }
+}
+
+/* 3. 임팩트 폭발 */
+@keyframes hero-impact-burst {
+  0%   { transform: scale(0);   opacity: 0; }
+  20%  { transform: scale(0.9); opacity: 1; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+@keyframes hero-impact-ring {
+  0%   { transform: scale(0);   opacity: 0; }
+  25%  { transform: scale(0.7); opacity: 1; }
+  100% { transform: scale(2.0); opacity: 0; }
+}
+
+/* 4. 로고 등장 후 고정 */
+@keyframes hero-logo-kick-reveal {
+  0%   { opacity: 0; transform: scale(0.1) rotate(-8deg); filter: brightness(8) blur(16px); }
+  20%  { opacity: 1; transform: scale(1.18) rotate(3deg);  filter: brightness(3) blur(2px); }
+  50%  { transform: scale(0.94) rotate(-1deg); filter: brightness(1.6); }
+  75%  { transform: scale(1.05) rotate(0.5deg); filter: brightness(1.2); }
+  100% { transform: scale(1)    rotate(0deg);   filter: brightness(1); }
+}
+
+/* Classes */
+.hero-boy-anim        { animation: hero-boy-enter    1.9s ease-in-out both; }
+.hero-ball-wrap       { animation: hero-ball-fly     0.85s cubic-bezier(0.25,0.8,0.25,1) 0.5s both; }
+.hero-ball-spin-anim  { animation: hero-ball-spin    0.85s linear 0.5s both; }
+.hero-impact-anim     { animation: hero-impact-burst 0.65s ease-out 1.28s both; }
+.hero-impact-anim2    { animation: hero-impact-ring  0.8s ease-out  1.3s  both; }
+.hero-logo-kick {
+  animation: hero-logo-kick-reveal 1.0s cubic-bezier(0.22,1,0.36,1) 1.38s both;
+}
+
+/* ── 번개 효과 ── */
+/* 번개 1 — 왼쪽 (0~6%) 빠른 4회 플리커 */
+@keyframes lightning-flash {
+  0%,100%  { opacity:0; filter:brightness(1); }
+  1%       { opacity:1; filter:brightness(3); }
+  1.4%     { opacity:0.1; }
+  2%       { opacity:1; filter:brightness(4); }
+  2.3%     { opacity:0.3; filter:brightness(1.5); }
+  2.8%     { opacity:1; filter:brightness(3.5); }
+  3.2%     { opacity:0.15; }
+  3.7%     { opacity:0.9; filter:brightness(2.5); }
+  4.2%     { opacity:0.05; }
+  4.6%     { opacity:0.7; filter:brightness(2); }
+  5.5%     { opacity:0; }
+}
+/* 번개 2 — 오른쪽 (14~20%) */
+@keyframes lightning-flash2 {
+  0%,13%,100% { opacity:0; filter:brightness(1); }
+  14%     { opacity:1; filter:brightness(3.5); }
+  14.5%   { opacity:0.2; }
+  15.2%   { opacity:1; filter:brightness(4); }
+  15.6%   { opacity:0.35; filter:brightness(1.5); }
+  16.1%   { opacity:1; filter:brightness(3); }
+  16.5%   { opacity:0.1; }
+  17%     { opacity:0.85; filter:brightness(2.5); }
+  17.4%   { opacity:0.25; }
+  18%     { opacity:0.7; filter:brightness(2); }
+  19.5%   { opacity:0; }
+}
+/* 번개 3 — 중앙 (38~45%) 가장 강렬 */
+@keyframes lightning-flash3 {
+  0%,37%,100% { opacity:0; filter:brightness(1); }
+  38%     { opacity:1; filter:brightness(5); }
+  38.3%   { opacity:0.05; }
+  38.8%   { opacity:1; filter:brightness(4.5); }
+  39.1%   { opacity:0.2; filter:brightness(1.5); }
+  39.6%   { opacity:1; filter:brightness(4); }
+  40%     { opacity:0.4; }
+  40.5%   { opacity:1; filter:brightness(3.5); }
+  40.8%   { opacity:0.15; }
+  41.3%   { opacity:0.8; filter:brightness(2.5); }
+  41.7%   { opacity:0.3; }
+  42.2%   { opacity:0.6; filter:brightness(2); }
+  43.5%   { opacity:0; }
+}
+/* 번개 4 — 왼쪽 작은 가지 (63~69%) */
+@keyframes lightning-flash4 {
+  0%,62%,100% { opacity:0; filter:brightness(1); }
+  63%     { opacity:1; filter:brightness(3.5); }
+  63.4%   { opacity:0.1; }
+  64%     { opacity:1; filter:brightness(4); }
+  64.3%   { opacity:0.25; filter:brightness(1.5); }
+  64.8%   { opacity:1; filter:brightness(3); }
+  65.2%   { opacity:0.2; }
+  65.7%   { opacity:0.8; filter:brightness(2.5); }
+  66.1%   { opacity:0.05; }
+  66.6%   { opacity:0.6; filter:brightness(2); }
+  68%     { opacity:0; }
+}
+/* 배경 글로우 (번개 칠 때 배경도 번쩍) */
+@keyframes lightning-glow {
+  0%,100% { opacity:0; }
+  1%,2%,2.8%,3.7% { opacity:0.7; }
+  1.4%,2.3%,3.2%,4.2% { opacity:0.05; }
+  5.5%    { opacity:0; }
+  14%,15.2%,16.1%,17% { opacity:0.65; }
+  14.5%,15.6%,16.5%,17.4% { opacity:0.05; }
+  19.5%   { opacity:0; }
+  38%,38.8%,39.6%,40.5% { opacity:0.9; }
+  38.3%,39.1%,40%,40.8% { opacity:0.05; }
+  43.5%   { opacity:0; }
+  63%,64%,64.8%,65.7% { opacity:0.65; }
+  63.4%,64.3%,65.2%,66.1% { opacity:0.05; }
+  68%     { opacity:0; }
+}
+/* 번개 칠 때 배경 하얗게 번쩍이는 섬광 */
+@keyframes lightning-screen-flash {
+  0%,100%  { opacity:0; }
+  1%       { opacity:0.35; }
+  1.4%     { opacity:0; }
+  2%       { opacity:0.25; }
+  2.8%     { opacity:0.4; }
+  3.2%     { opacity:0; }
+  3.7%     { opacity:0.2; }
+  5.5%     { opacity:0; }
+  14%      { opacity:0.3; }
+  14.5%    { opacity:0; }
+  15.2%    { opacity:0.35; }
+  16.1%    { opacity:0.15; }
+  19.5%    { opacity:0; }
+  38%      { opacity:0.45; }
+  38.3%    { opacity:0; }
+  38.8%    { opacity:0.5; }
+  39.6%    { opacity:0.25; }
+  40.5%    { opacity:0.3; }
+  43.5%    { opacity:0; }
+  63%      { opacity:0.3; }
+  63.4%    { opacity:0; }
+  64%      { opacity:0.35; }
+  64.8%    { opacity:0.15; }
+  68%      { opacity:0; }
+}
+/* 로고 등장(1.38s + 1.0s = 2.38s) 이후 번쩍 시작 */
+.lightning-1      { animation: lightning-flash        2.8s linear 2.5s infinite backwards; }
+.lightning-2      { animation: lightning-flash2       2.8s linear 2.5s infinite backwards; }
+.lightning-3      { animation: lightning-flash3       2.8s linear 2.5s infinite backwards; }
+.lightning-4      { animation: lightning-flash4       2.8s linear 2.5s infinite backwards; }
+.lightning-glow   { animation: lightning-glow         2.8s linear 2.5s infinite backwards; }
+.lightning-screen { animation: lightning-screen-flash 2.8s linear 2.5s infinite backwards; }
+
+/* ── 기본 유틸 ── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes pulse-red {
   0%, 100% { box-shadow: 0 0 0 0 rgba(204,0,0,0.4); }
-  50% { box-shadow: 0 0 0 10px rgba(204,0,0,0); }
+  50%       { box-shadow: 0 0 0 10px rgba(204,0,0,0); }
 }
 @keyframes ticker {
-  0% { transform: translateX(0); }
+  0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%       { opacity: 0.7; transform: scale(1.2); }
+}
+@keyframes hero-text-glow {
+  0%, 100% { text-shadow: 0 0 20px rgba(204,0,0,0.5); }
+  50%       { text-shadow: 0 0 40px rgba(204,0,0,0.9), 0 0 80px rgba(204,0,0,0.4); }
+}
 
-.fade-in-up { animation: fadeInUp 0.6s ease forwards; }
+/* ── 로고 플로팅 (인트로 후 유지) ── */
+@keyframes logo-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+
+/* ── 불꽃 인트로: 로고 등장 ── */
+@keyframes logo-reveal {
+  0%   { opacity: 0; transform: scale(0.4); filter: brightness(4) saturate(0) blur(8px); }
+  25%  { opacity: 1; transform: scale(1.15); filter: brightness(3) saturate(2) blur(2px); }
+  55%  { transform: scale(0.97); filter: brightness(1.8) saturate(1.5) blur(0px); }
+  80%  { transform: scale(1.04); filter: brightness(1.2) saturate(1.2); }
+  100% { transform: scale(1);    filter: brightness(1) saturate(1); }
+}
+
+/* ── 불꽃 기둥: 아래서 위로 치솟았다 사그라짐 ── */
+@keyframes flame-tongue {
+  0%   { transform: scaleY(0) translateY(0); opacity: 0; }
+  15%  { transform: scaleY(1.3) translateY(-20px); opacity: 1; }
+  50%  { transform: scaleY(1) translateY(-10px); opacity: 0.85; }
+  100% { transform: scaleY(0.2) translateY(20px); opacity: 0; }
+}
+
+/* ── 폭발 링 ── */
+@keyframes flame-burst {
+  0%   { transform: scale(0.2); opacity: 1; }
+  60%  { transform: scale(1.6); opacity: 0.6; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* ── 불씨 파티클 ── */
+@keyframes ember-fly {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--ex), var(--ey)) scale(0); opacity: 0; }
+}
+
+/* ── 지속 글로우 (인트로 끝난 뒤) ── */
+@keyframes after-glow {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.8; }
+}
+
+/* ── 클래스 ── */
+.fade-in-up        { animation: fadeInUp 0.6s ease forwards; }
 .animate-pulse-red { animation: pulse-red 2s infinite; }
-.ticker-wrap { overflow: hidden; white-space: nowrap; }
-.ticker { display: inline-block; animation: ticker 20s linear infinite; }
+.ticker-wrap       { overflow: hidden; white-space: nowrap; }
+.ticker            { display: inline-block; animation: ticker 20s linear infinite; }
+.glow-pulse        { animation: glow-pulse 2s ease-in-out infinite; }
+.hero-text-glow    { animation: hero-text-glow 2.5s ease-in-out infinite; }
+
+/* 로고 등장: 1회만, 끝나면 float 유지 */
+.logo-reveal {
+  animation:
+    logo-reveal 1.6s cubic-bezier(0.22,1,0.36,1) forwards,
+    logo-float  3.5s ease-in-out 1.6s infinite;
+}
+
+/* 불꽃 기둥들 */
+.flame-t1 { transform-origin: bottom center; animation: flame-tongue 1.4s ease-out 0.1s 1 forwards; }
+.flame-t2 { transform-origin: bottom center; animation: flame-tongue 1.6s ease-out 0.0s 1 forwards; }
+.flame-t3 { transform-origin: bottom center; animation: flame-tongue 1.2s ease-out 0.2s 1 forwards; }
+.flame-t4 { transform-origin: bottom center; animation: flame-tongue 1.5s ease-out 0.15s 1 forwards; }
+.flame-t5 { transform-origin: bottom center; animation: flame-tongue 1.3s ease-out 0.05s 1 forwards; }
+.flame-t6 { transform-origin: bottom center; animation: flame-tongue 1.7s ease-out 0.25s 1 forwards; }
+
+/* 폭발 링 */
+.flame-burst1 { animation: flame-burst 1.0s ease-out 0.05s 1 forwards; }
+.flame-burst2 { animation: flame-burst 1.3s ease-out 0.2s  1 forwards; }
+.flame-burst3 { animation: flame-burst 1.6s ease-out 0.35s 1 forwards; }
+
+/* 불씨 */
+.ember { animation: ember-fly 1.2s ease-out forwards; }
+
+/* 잔광 (인트로 후) */
+.after-glow { animation: after-glow 2.5s ease-in-out 1.6s infinite; }
+
+/* Navbar 로고 즉시 글로우 (딜레이 없음) */
+.after-glow-now { animation: after-glow 2.5s ease-in-out infinite; }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #111; }

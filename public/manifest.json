@@ -1,0 +1,26 @@
+{
+  "name": "TAES FC PREMIER",
+  "short_name": "TAES FC",
+  "description": "태즈 FC 프리미어 팬페이지",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#CC0000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/taes-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/taes-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["sports", "social"],
+  "lang": "ko"
+}
