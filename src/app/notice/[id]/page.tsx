@@ -4,59 +4,97 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Notice } from '../page';
+import { db } from '@/lib/firebase';
+import {
+  collection, getDocs, doc, updateDoc, deleteDoc, orderBy, query, increment
+} from 'firebase/firestore';
 
-const STORAGE_KEY = 'taes-notices-v1';
 const CAT_COLORS: Record<string, string> = {
   중요: '#dc2626', 훈련: '#2563eb', 행사: '#16a34a', 대회: '#ca8a04', 공지: '#6b7280',
 };
 const CATEGORIES = ['중요', '훈련', '행사', '대회', '공지'];
 
-function loadNotices(): Notice[] {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]'); } catch { return []; }
-}
-function saveNotices(list: Notice[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-}
-
 export default function NoticeDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const id = Number(params.id);
+  const id = String(params.id);
 
   const [notices, setNotices] = useState<Notice[]>([]);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ category: '', title: '', content: '', author: '', pinned: false });
 
   useEffect(() => {
-    const list = loadNotices();
-    setNotices(list);
-    const found = list.find(n => n.id === id);
-    if (found) {
-      // increment views
-      const updated = list.map(n => n.id === id ? { ...n, views: n.views + 1 } : n);
-      saveNotices(updated);
-      setNotices(updated);
-      setNotice({ ...found, views: found.views + 1 });
-      setForm({ category: found.category, title: found.title, content: found.content, author: found.author, pinned: found.pinned });
+    async function loadNotices() {
+      setLoading(true);
+      try {
+        const q = query(collection(db, 'notices'), orderBy('date', 'desc'));
+        const snap = await getDocs(q);
+        const list: Notice[] = snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Notice, 'id'>) }));
+        setNotices(list);
+
+        const found = list.find(n => n.id === id);
+        if (found) {
+          // Increment views
+          await updateDoc(doc(db, 'notices', id), { views: increment(1) });
+          const withViews = { ...found, views: found.views + 1 };
+          setNotice(withViews);
+          setForm({ category: found.category, title: found.title, content: found.content, author: found.author, pinned: found.pinned });
+        }
+      } catch (err) {
+        console.error('Failed to load notice:', err);
+      } finally {
+        setLoading(false);
+      }
     }
+    loadNotices();
   }, [id]);
 
-  function handleSave() {
+  async function handleSave() {
     if (!form.title.trim() || !form.author.trim()) return;
-    const updated = notices.map(n => n.id === id ? { ...n, ...form } : n);
-    saveNotices(updated);
-    setNotices(updated);
-    const updatedNotice = updated.find(n => n.id === id) ?? null;
-    setNotice(updatedNotice);
-    setEditing(false);
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'notices', id), {
+        category: form.category,
+        title: form.title,
+        content: form.content,
+        author: form.author,
+        pinned: form.pinned,
+      });
+      const updated: Notice = { ...notice!, ...form };
+      setNotice(updated);
+      setNotices(prev => prev.map(n => n.id === id ? updated : n));
+      setEditing(false);
+    } catch (err) {
+      console.error('Failed to save:', err);
+      alert('저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!confirm('이 공지를 삭제할까요?')) return;
-    const updated = notices.filter(n => n.id !== id);
-    saveNotices(updated);
-    router.push('/notice');
+    try {
+      await deleteDoc(doc(db, 'notices', id));
+      router.push('/notice');
+    } catch (err) {
+      console.error('Failed to delete:', err);
+      alert('삭제에 실패했습니다.');
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white/30">
+        <div className="text-center">
+          <div className="text-5xl mb-3 animate-pulse">📋</div>
+          <div>로딩 중...</div>
+        </div>
+      </div>
+    );
   }
 
   if (!notice) {
@@ -182,7 +220,14 @@ export default function NoticeDetailPage() {
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setEditing(false)} className="flex-1 py-2 text-sm font-bold text-white/50 border border-white/10 hover:border-white/30 transition-colors">취소</button>
-              <button onClick={handleSave} disabled={!form.title.trim() || !form.author.trim()} className="flex-1 py-2 text-sm font-bold text-white hover:opacity-80 disabled:opacity-30 transition-colors" style={{ backgroundColor: '#CC0000' }}>저장</button>
+              <button
+                onClick={handleSave}
+                disabled={!form.title.trim() || !form.author.trim() || saving}
+                className="flex-1 py-2 text-sm font-bold text-white hover:opacity-80 disabled:opacity-30 transition-colors"
+                style={{ backgroundColor: '#CC0000' }}
+              >
+                {saving ? '저장 중...' : '저장'}
+              </button>
             </div>
           </div>
         )}

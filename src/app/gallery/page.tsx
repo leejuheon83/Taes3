@@ -3,6 +3,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { useRouter } from 'next/navigation';
+import { db, storage } from '@/lib/firebase';
+import {
+  collection, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, orderBy, query
+} from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const USER_AUTH_KEY = 'taes-user-login';
 
@@ -27,35 +32,18 @@ function compressImage(file: File, maxDim = 1200, quality = 0.75): Promise<strin
   });
 }
 
-type MediaItem = { id: number; data: string; name: string; type: 'photo' };
-type Album = { id: number; title: string; date: string; grade?: string; items: MediaItem[] };
-
-const STORAGE_KEY = 'taes-gallery-v2';
-
-function loadAlbums(): Album[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-function saveAlbums(albums: Album[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(albums));
-  } catch {
-    alert('저장 용량이 초과되었습니다. 사진 수를 줄여보세요.');
-  }
-}
-
-const FEATURED_KEY = 'taes-featured-photo';
+type MediaItem = { id: string; url: string; name: string; type: 'photo' };
+type Album = { id: string; title: string; date: string; grade?: string; items: MediaItem[] };
 
 export default function GalleryPage() {
   const { requireAdmin, modal: adminModal } = useAdminAuth();
   const router = useRouter();
   const [albums, setAlbums] = useState<Album[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [view, setView] = useState<'albums' | 'all'>('albums');
   const [openAlbum, setOpenAlbum] = useState<Album | null>(null);
-  const [featuredPhotoId, setFeaturedPhotoId] = useState<number | null>(null);
+  const [featuredPhotoId, setFeaturedPhotoId] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
   const [showNewAlbum, setShowNewAlbum] = useState(false);
@@ -63,10 +51,10 @@ export default function GalleryPage() {
   const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10).replace(/-/g, '.'));
 
   const [showUpload, setShowUpload] = useState(false);
-  const [uploadAlbumId, setUploadAlbumId] = useState<number | ''>('');
-  const [uploadPreviews, setUploadPreviews] = useState<MediaItem[]>([]);
+  const [uploadAlbumId, setUploadAlbumId] = useState<string>('');
+  const [uploadPreviews, setUploadPreviews] = useState<{ dataUrl: string; name: string }[]>([]);
 
-  const [lightbox, setLightbox] = useState<{ albumId: number; itemIdx: number } | null>(null);
+  const [lightbox, setLightbox] = useState<{ albumId: string; itemIdx: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -77,38 +65,81 @@ export default function GalleryPage() {
       return;
     }
     setAuthChecked(true);
-    setAlbums(loadAlbums());
-    try {
-      const raw = localStorage.getItem('taes-featured-photo-id');
-      if (raw) setFeaturedPhotoId(Number(raw));
-    } catch {}
+    loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const q = query(collection(db, 'albums'), orderBy('date', 'desc'));
+      const snap = await getDocs(q);
+      const loaded: Album[] = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as Omit<Album, 'id'>),
+      }));
+      setAlbums(loaded);
+
+      // Load featured photo id from settings
+      const settingsSnap = await getDoc(doc(db, 'settings', 'main'));
+      if (settingsSnap.exists()) {
+        const data = settingsSnap.data();
+        if (data.featuredPhoto?.id) setFeaturedPhotoId(data.featuredPhoto.id);
+      }
+    } catch (err) {
+      console.error('Failed to load gallery:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   if (!authChecked) return null;
 
-  function persist(next: Album[]) {
-    setAlbums(next);
-    saveAlbums(next);
-  }
-
-  function handleCreateAlbum() {
+  async function handleCreateAlbum() {
     if (!newTitle.trim()) return;
-    const album: Album = { id: Date.now(), title: newTitle.trim(), date: newDate, items: [] };
-    persist([...albums, album]);
+    const albumId = String(Date.now());
+    const album: Album = { id: albumId, title: newTitle.trim(), date: newDate, items: [] };
+    try {
+      await setDoc(doc(db, 'albums', albumId), {
+        title: album.title,
+        date: album.date,
+        items: [],
+      });
+      setAlbums(prev => [album, ...prev]);
+    } catch (err) {
+      console.error('Failed to create album:', err);
+      alert('앨범 생성에 실패했습니다.');
+    }
     setShowNewAlbum(false);
     setNewTitle('');
   }
 
-  function handleDeleteAlbum(id: number) {
+  async function handleDeleteAlbum(id: string) {
     if (!confirm('앨범을 삭제하면 사진·영상도 모두 삭제됩니다. 계속할까요?')) return;
-    persist(albums.filter(a => a.id !== id));
-    if (openAlbum?.id === id) setOpenAlbum(null);
+    try {
+      const album = albums.find(a => a.id === id);
+      if (album) {
+        // Delete all photos from storage
+        for (const item of album.items) {
+          try {
+            const sRef = storageRef(storage, `gallery/${id}/${item.id}.jpg`);
+            await deleteObject(sRef);
+          } catch { /* ignore */ }
+        }
+      }
+      await deleteDoc(doc(db, 'albums', id));
+      setAlbums(prev => prev.filter(a => a.id !== id));
+      if (openAlbum?.id === id) setOpenAlbum(null);
+    } catch (err) {
+      console.error('Failed to delete album:', err);
+      alert('앨범 삭제에 실패했습니다.');
+    }
   }
 
-  async function readFiles(files: File[]): Promise<MediaItem[]> {
+  async function readFiles(files: File[]): Promise<{ dataUrl: string; name: string }[]> {
     return Promise.all(files.map(async file => {
-      const data = await compressImage(file, 1200, 0.75);
-      return { id: Date.now() + Math.random(), data, name: file.name, type: 'photo' as const };
+      const dataUrl = await compressImage(file, 1200, 0.75);
+      return { dataUrl, name: file.name };
     }));
   }
 
@@ -119,48 +150,107 @@ export default function GalleryPage() {
     e.target.value = '';
   }
 
-  function addItemsToAlbum(albumId: number, items: MediaItem[]) {
-    const next = albums.map(a => {
-      if (a.id !== albumId) return a;
-      return { ...a, items: [...a.items, ...items] };
-    });
-    persist(next);
-    if (openAlbum?.id === albumId) setOpenAlbum(next.find(a => a.id === albumId) ?? null);
-  }
-
-  function handleUploadConfirm() {
+  async function handleUploadConfirm() {
     if (!uploadAlbumId || !uploadPreviews.length) return;
-    addItemsToAlbum(Number(uploadAlbumId), uploadPreviews);
-    setShowUpload(false);
-    setUploadPreviews([]);
-    setUploadAlbumId('');
-  }
-
-  function handleDeleteItem(albumId: number, itemId: number) {
-    const next = albums.map(a => {
-      if (a.id !== albumId) return a;
-      return { ...a, items: a.items.filter(p => p.id !== itemId) };
-    });
-    persist(next);
-    if (openAlbum?.id === albumId) setOpenAlbum(next.find(a => a.id === albumId) ?? null);
-  }
-
-  function handleSetFeatured(item: MediaItem) {
+    setUploading(true);
     try {
-      localStorage.setItem(FEATURED_KEY, item.data);
-      localStorage.setItem('taes-featured-photo-id', String(item.id));
+      const album = albums.find(a => a.id === uploadAlbumId);
+      if (!album) return;
+
+      const newItems: MediaItem[] = [];
+      for (const preview of uploadPreviews) {
+        const itemId = String(Date.now() + Math.random());
+        // Upload to Firebase Storage
+        const response = await fetch(preview.dataUrl);
+        const blob = await response.blob();
+        const sRef = storageRef(storage, `gallery/${uploadAlbumId}/${itemId}.jpg`);
+        await uploadBytes(sRef, blob);
+        const url = await getDownloadURL(sRef);
+        newItems.push({ id: itemId, url, name: preview.name, type: 'photo' });
+      }
+
+      const updatedItems = [...album.items, ...newItems];
+      await updateDoc(doc(db, 'albums', uploadAlbumId), { items: updatedItems });
+
+      setAlbums(prev => prev.map(a => a.id === uploadAlbumId ? { ...a, items: updatedItems } : a));
+      if (openAlbum?.id === uploadAlbumId) {
+        setOpenAlbum(prev => prev ? { ...prev, items: updatedItems } : null);
+      }
+    } catch (err) {
+      console.error('Upload failed:', err);
+      alert('업로드에 실패했습니다.');
+    } finally {
+      setUploading(false);
+      setShowUpload(false);
+      setUploadPreviews([]);
+      setUploadAlbumId('');
+    }
+  }
+
+  async function handleDeleteItem(albumId: string, itemId: string) {
+    const album = albums.find(a => a.id === albumId);
+    if (!album) return;
+    try {
+      // Delete from storage
+      try {
+        const sRef = storageRef(storage, `gallery/${albumId}/${itemId}.jpg`);
+        await deleteObject(sRef);
+      } catch { /* ignore */ }
+
+      const updatedItems = album.items.filter(p => p.id !== itemId);
+      await updateDoc(doc(db, 'albums', albumId), { items: updatedItems });
+      setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, items: updatedItems } : a));
+      if (openAlbum?.id === albumId) {
+        setOpenAlbum(prev => prev ? { ...prev, items: updatedItems } : null);
+      }
+    } catch (err) {
+      console.error('Failed to delete item:', err);
+      alert('삭제에 실패했습니다.');
+    }
+  }
+
+  async function handleSetFeatured(item: MediaItem) {
+    try {
+      await setDoc(doc(db, 'settings', 'main'), {
+        featuredPhoto: { id: item.id, url: item.url }
+      }, { merge: true });
       setFeaturedPhotoId(item.id);
-    } catch {
+    } catch (err) {
+      console.error('Failed to set featured:', err);
       alert('설정 저장에 실패했습니다.');
     }
   }
 
-  function handleAlbumFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleAlbumFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     if (!openAlbum) return;
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
-    readFiles(files).then(items => addItemsToAlbum(openAlbum.id, items));
     e.target.value = '';
+
+    setUploading(true);
+    try {
+      const previews = await readFiles(files);
+      const newItems: MediaItem[] = [];
+      for (const preview of previews) {
+        const itemId = String(Date.now() + Math.random());
+        const response = await fetch(preview.dataUrl);
+        const blob = await response.blob();
+        const sRef = storageRef(storage, `gallery/${openAlbum.id}/${itemId}.jpg`);
+        await uploadBytes(sRef, blob);
+        const url = await getDownloadURL(sRef);
+        newItems.push({ id: itemId, url, name: preview.name, type: 'photo' });
+      }
+
+      const updatedItems = [...openAlbum.items, ...newItems];
+      await updateDoc(doc(db, 'albums', openAlbum.id), { items: updatedItems });
+      setAlbums(prev => prev.map(a => a.id === openAlbum.id ? { ...a, items: updatedItems } : a));
+      setOpenAlbum(prev => prev ? { ...prev, items: updatedItems } : null);
+    } catch (err) {
+      console.error('Upload failed:', err);
+      alert('업로드에 실패했습니다.');
+    } finally {
+      setUploading(false);
+    }
   }
 
   const filteredAlbums = albums;
@@ -177,6 +267,15 @@ export default function GalleryPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-10">
+
+        {uploading && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+            <div className="text-white text-center">
+              <div className="text-2xl mb-3 animate-spin">⏳</div>
+              <div className="font-bold">업로드 중...</div>
+            </div>
+          </div>
+        )}
 
         {/* ── 앨범 내부 뷰 ── */}
         {openAlbum ? (
@@ -220,20 +319,19 @@ export default function GalleryPage() {
                   const isFeatured = featuredPhotoId === item.id;
                   return (
                   <div key={item.id} className="relative group aspect-square">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={item.data}
+                      src={item.url}
                       alt={item.name}
                       className="w-full h-full object-cover cursor-pointer border transition-colors"
                       style={{ borderColor: isFeatured ? '#CC0000' : 'rgba(255,255,255,0.1)' }}
                       onClick={() => setLightbox({ albumId: openAlbum.id, itemIdx: idx })}
                     />
-                    {/* 메인 설정 배지 */}
                     {isFeatured && (
                       <div className="absolute bottom-1 left-1 text-white text-[9px] font-black px-1.5 py-0.5 z-10" style={{ backgroundColor: '#CC0000' }}>
                         ★ 메인
                       </div>
                     )}
-                    {/* 호버 액션 버튼들 */}
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 z-10">
                       <button
                         onClick={(e) => { e.stopPropagation(); requireAdmin(() => handleSetFeatured(item)); }}
@@ -286,7 +384,14 @@ export default function GalleryPage() {
               </button>
             </div>
 
-            {view === 'albums' ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-24 text-white/30">
+                <div className="text-center">
+                  <div className="text-4xl mb-3 animate-pulse">📷</div>
+                  <div>로딩 중...</div>
+                </div>
+              </div>
+            ) : view === 'albums' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {filteredAlbums.map(album => (
                   <div key={album.id} className="relative group">
@@ -297,7 +402,8 @@ export default function GalleryPage() {
                     >
                       <div className="aspect-video flex items-center justify-center border-b border-white/5 overflow-hidden relative" style={{ backgroundColor: '#0e0e0e' }}>
                         {album.items[0] ? (
-                          <img src={album.items[0].data} alt="thumb" className="w-full h-full object-cover" />
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={album.items[0].url} alt="thumb" className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-5xl text-white/10">📷</span>
                         )}
@@ -345,7 +451,8 @@ export default function GalleryPage() {
                         className="relative group aspect-square cursor-pointer"
                         onClick={() => setLightbox({ albumId: item.albumId, itemIdx: idx })}
                       >
-                        <img src={item.data} alt={item.name} className="w-full h-full object-cover border border-white/10 hover:border-red-800/50 transition-colors" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={item.url} alt={item.name} className="w-full h-full object-cover border border-white/10 hover:border-red-800/50 transition-colors" />
                       </div>
                     ))}
                   </div>
@@ -416,7 +523,7 @@ export default function GalleryPage() {
               ) : (
                 <select
                   value={uploadAlbumId}
-                  onChange={e => setUploadAlbumId(Number(e.target.value))}
+                  onChange={e => setUploadAlbumId(e.target.value)}
                   className="w-full px-3 py-2 text-white text-sm border border-white/10 outline-none"
                   style={{ backgroundColor: '#0e0e0e' }}
                 >
@@ -443,7 +550,8 @@ export default function GalleryPage() {
                 <div className="grid grid-cols-5 gap-1 max-h-40 overflow-y-auto">
                   {uploadPreviews.map((p, i) => (
                     <div key={i} className="relative aspect-square group">
-                      <img src={p.data} alt={p.name} className="w-full h-full object-cover border border-white/10" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.dataUrl} alt={p.name} className="w-full h-full object-cover border border-white/10" />
                       <button
                         onClick={() => setUploadPreviews(prev => prev.filter((_, idx) => idx !== i))}
                         className="absolute top-0 right-0 w-5 h-5 bg-black/80 text-white/70 hover:text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -460,11 +568,11 @@ export default function GalleryPage() {
               <button onClick={() => { setShowUpload(false); setUploadPreviews([]); }} className="flex-1 py-2 text-sm font-bold text-white/50 border border-white/10 hover:border-white/30 transition-colors">취소</button>
               <button
                 onClick={handleUploadConfirm}
-                disabled={!uploadAlbumId || uploadPreviews.length === 0}
+                disabled={!uploadAlbumId || uploadPreviews.length === 0 || uploading}
                 className="flex-1 py-2 text-sm font-bold text-white hover:opacity-80 disabled:opacity-30 transition-colors"
                 style={{ backgroundColor: '#CC0000' }}
               >
-                업로드 ({uploadPreviews.length}개)
+                {uploading ? '업로드 중...' : `업로드 (${uploadPreviews.length}개)`}
               </button>
             </div>
           </div>
@@ -474,9 +582,12 @@ export default function GalleryPage() {
       {/* ── 라이트박스 ── */}
       {lightbox && (() => {
         const album = albums.find(a => a.id === lightbox.albumId);
-        const item = album?.items[lightbox.itemIdx];
+        // For 'all' view, we need to find by index in allItems
+        const isAllView = view === 'all' && !openAlbum;
+        const items = isAllView ? allItems : album?.items ?? [];
+        const item = items[lightbox.itemIdx];
         if (!item) return null;
-        const total = album!.items.length;
+        const total = items.length;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.97)' }} onClick={() => setLightbox(null)}>
             <button className="absolute top-4 right-4 text-white/50 hover:text-white text-2xl z-10 p-2" onClick={() => setLightbox(null)}>✕</button>
@@ -484,7 +595,8 @@ export default function GalleryPage() {
               <button className="absolute left-2 sm:left-6 text-white/50 hover:text-white text-5xl z-10 p-4" onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, itemIdx: l.itemIdx - 1 } : null); }}>‹</button>
             )}
             <div className="max-w-5xl w-full px-16" onClick={e => e.stopPropagation()}>
-              <img src={item.data} alt={item.name} className="max-h-[85vh] mx-auto object-contain" style={{ maxHeight: '85vh', maxWidth: '100%' }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={item.url} alt={item.name} className="max-h-[85vh] mx-auto object-contain" style={{ maxHeight: '85vh', maxWidth: '100%' }} />
             </div>
             {lightbox.itemIdx < total - 1 && (
               <button className="absolute right-2 sm:right-6 text-white/50 hover:text-white text-5xl z-10 p-4" onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, itemIdx: l.itemIdx + 1 } : null); }}>›</button>

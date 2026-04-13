@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import HeroAnimation from '@/components/HeroAnimation';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, doc, getDoc, orderBy, query, limit } from 'firebase/firestore';
 
 
 const schedule = [
@@ -34,34 +36,48 @@ const categoryColors: Record<string, string> = {
 
 export default function Home() {
   const [gradeCounts, setGradeCounts] = useState<Record<string, number>>({ '3학년': 0 });
-  const [notices, setNotices] = useState<{ id: number; category: string; title: string; date: string; views: number }[]>([]);
+  const [notices, setNotices] = useState<{ id: string; category: string; title: string; date: string; views: number }[]>([]);
   const [featuredPhoto, setFeaturedPhoto] = useState<string | null>(null);
-  const [featuredVideo, setFeaturedVideo] = useState<{ id: number; title: string; type: 'upload' | 'youtube'; youtubeId?: string; date: string } | null>(null);
+  const [featuredVideo, setFeaturedVideo] = useState<{ id: string; title: string; type: 'upload' | 'youtube'; youtubeId?: string; date: string } | null>(null);
 
   useEffect(() => {
-    try {
-      const players = JSON.parse(localStorage.getItem('taes-players-v2') ?? '[]');
-      const counts: Record<string, number> = { '3학년': 0 };
-      for (const p of players) {
-        if (p.grade in counts) counts[p.grade]++;
-      }
-      setGradeCounts(counts);
-    } catch {}
+    async function loadData() {
+      try {
+        // Load player counts
+        const playersSnap = await getDocs(collection(db, 'players'));
+        const counts: Record<string, number> = { '3학년': 0 };
+        playersSnap.forEach(d => {
+          const grade = d.data().grade;
+          if (grade in counts) counts[grade]++;
+        });
+        setGradeCounts(counts);
+      } catch { /* ignore */ }
 
-    try {
-      const all = JSON.parse(localStorage.getItem('taes-notices-v1') ?? '[]');
-      setNotices(all.slice(0, 5));
-    } catch {}
+      try {
+        // Load latest notices
+        const q = query(collection(db, 'notices'), orderBy('date', 'desc'), limit(5));
+        const snap = await getDocs(q);
+        const loaded = snap.docs.map(d => ({
+          id: d.id,
+          category: d.data().category,
+          title: d.data().title,
+          date: d.data().date,
+          views: d.data().views ?? 0,
+        }));
+        setNotices(loaded);
+      } catch { /* ignore */ }
 
-    try {
-      const fp = localStorage.getItem('taes-featured-photo');
-      if (fp) setFeaturedPhoto(fp);
-    } catch {}
-
-    try {
-      const fv = localStorage.getItem('taes-featured-video');
-      if (fv) setFeaturedVideo(JSON.parse(fv));
-    } catch {}
+      try {
+        // Load featured photo and video from settings
+        const settingsSnap = await getDoc(doc(db, 'settings', 'main'));
+        if (settingsSnap.exists()) {
+          const data = settingsSnap.data();
+          if (data.featuredPhoto?.url) setFeaturedPhoto(data.featuredPhoto.url);
+          if (data.featuredVideo) setFeaturedVideo(data.featuredVideo);
+        }
+      } catch { /* ignore */ }
+    }
+    loadData();
   }, []);
 
   return (
@@ -250,7 +266,7 @@ export default function Home() {
                       className="flex items-center gap-4 py-4 px-4 border border-white/5 hover:border-red-800/50 transition-all group"
                       style={{ backgroundColor: '#0a0a0a' }}
                     >
-                      <span className={`${categoryColors[n.category]} text-white text-[10px] font-bold px-2 py-0.5 flex-shrink-0`}>{n.category}</span>
+                      <span className={`${categoryColors[n.category] || 'bg-gray-600'} text-white text-[10px] font-bold px-2 py-0.5 flex-shrink-0`}>{n.category}</span>
                       <span className="flex-1 text-white/80 group-hover:text-white text-sm font-medium truncate transition-colors">{n.title}</span>
                       <div className="flex items-center gap-4 text-white/30 text-xs flex-shrink-0">
                         <span>👁 {n.views}</span>

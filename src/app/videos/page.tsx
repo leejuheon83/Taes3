@@ -1,14 +1,19 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { useRouter } from 'next/navigation';
+import { db, storage } from '@/lib/firebase';
+import {
+  collection, getDocs, doc, setDoc, deleteDoc, getDoc, orderBy, query
+} from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const USER_AUTH_KEY = 'taes-user-login';
 
 type VideoType = 'upload' | 'youtube';
 type VideoMeta = {
-  id: number;
+  id: string;
   title: string;
   date: string;
   grade: string;
@@ -17,56 +22,8 @@ type VideoMeta = {
   youtubeId?: string;
   filename?: string;
   duration?: string;
+  storageURL?: string; // Firebase Storage URL for uploaded videos
 };
-
-const META_KEY = 'taes-videos-v1';
-const FEATURED_VIDEO_KEY = 'taes-featured-video';
-
-// ── IndexedDB helpers ──
-const DB_NAME = 'taes-video-blobs';
-const STORE = 'blobs';
-
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function saveBlob(id: number, blob: Blob) {
-  const db = await openDB();
-  return new Promise<void>((res, rej) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(blob, id);
-    tx.oncomplete = () => res();
-    tx.onerror = () => rej(tx.error);
-  });
-}
-async function loadBlobURL(id: number): Promise<string | null> {
-  const db = await openDB();
-  return new Promise(res => {
-    const tx = db.transaction(STORE, 'readonly');
-    const req = tx.objectStore(STORE).get(id);
-    req.onsuccess = () => res(req.result ? URL.createObjectURL(req.result) : null);
-    req.onerror = () => res(null);
-  });
-}
-async function deleteBlob(id: number) {
-  const db = await openDB();
-  return new Promise<void>(res => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).delete(id);
-    tx.oncomplete = () => res();
-  });
-}
-
-function loadMeta(): VideoMeta[] {
-  try { return JSON.parse(localStorage.getItem(META_KEY) ?? '[]'); } catch { return []; }
-}
-function saveMeta(list: VideoMeta[]) {
-  localStorage.setItem(META_KEY, JSON.stringify(list));
-}
 
 function extractYoutubeId(url: string): string {
   const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
@@ -75,6 +32,7 @@ function extractYoutubeId(url: string): string {
 
 function YoutubeThumb({ yid, title }: { yid: string; title: string }) {
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={`https://img.youtube.com/vi/${yid}/hqdefault.jpg`}
       alt={title}
@@ -84,20 +42,19 @@ function YoutubeThumb({ yid, title }: { yid: string; title: string }) {
   );
 }
 
-function VideoThumb({ id, filename }: { id: number; filename?: string }) {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => { loadBlobURL(id).then(setSrc); }, [id]);
-  if (!src) return <div className="w-full h-full flex items-center justify-center text-white/10 text-4xl">🎬</div>;
-  return <video src={src} className="w-full h-full object-cover" muted />;
+function VideoThumb({ storageURL }: { storageURL?: string }) {
+  if (!storageURL) return <div className="w-full h-full flex items-center justify-center text-white/10 text-4xl">🎬</div>;
+  return <video src={storageURL} className="w-full h-full object-cover" muted />;
 }
 
 export default function VideosPage() {
   const { requireAdmin, modal: adminModal } = useAdminAuth();
   const router = useRouter();
   const [metas, setMetas] = useState<VideoMeta[]>([]);
-  const [playingId, setPlayingId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [playingId, setPlayingId] = useState<string | null>(null);
   const [playingSrc, setPlayingSrc] = useState<string | null>(null);
-  const [featuredVideoId, setFeaturedVideoId] = useState<number | null>(null);
+  const [featuredVideoId, setFeaturedVideoId] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
   // 업로드 모달
@@ -115,12 +72,33 @@ export default function VideosPage() {
       return;
     }
     setAuthChecked(true);
-    setMetas(loadMeta());
-    try {
-      const raw = localStorage.getItem(FEATURED_VIDEO_KEY);
-      if (raw) setFeaturedVideoId(JSON.parse(raw).id);
-    } catch {}
+    loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const q = query(collection(db, 'videos'), orderBy('date', 'desc'));
+      const snap = await getDocs(q);
+      const loaded: VideoMeta[] = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as Omit<VideoMeta, 'id'>),
+      }));
+      setMetas(loaded);
+
+      // Load featured video
+      const settingsSnap = await getDoc(doc(db, 'settings', 'main'));
+      if (settingsSnap.exists()) {
+        const data = settingsSnap.data();
+        if (data.featuredVideo?.id) setFeaturedVideoId(data.featuredVideo.id);
+      }
+    } catch (err) {
+      console.error('Failed to load videos:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   if (!authChecked) return null;
 
@@ -133,10 +111,12 @@ export default function VideosPage() {
       setPlayingSrc(null);
       return;
     }
-    const url = await loadBlobURL(meta.id);
-    if (!url) { alert('영상 파일을 찾을 수 없습니다. 다시 업로드해 주세요.'); return; }
-    setPlayingId(meta.id);
-    setPlayingSrc(url);
+    if (meta.storageURL) {
+      setPlayingId(meta.id);
+      setPlayingSrc(meta.storageURL);
+    } else {
+      alert('영상 파일을 찾을 수 없습니다. 다시 업로드해 주세요.');
+    }
   }
 
   function handleClosePlayer() {
@@ -144,45 +124,107 @@ export default function VideosPage() {
     setPlayingSrc(null);
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete(id: string) {
     if (!confirm('영상을 삭제할까요?')) return;
-    const next = metas.filter(m => m.id !== id);
-    setMetas(next);
-    saveMeta(next);
-    await deleteBlob(id);
-    if (playingId === id) handleClosePlayer();
+    try {
+      const meta = metas.find(m => m.id === id);
+      // Delete from storage if uploaded video
+      if (meta?.type === 'upload') {
+        try {
+          const sRef = storageRef(storage, `videos/${id}`);
+          await deleteObject(sRef);
+        } catch { /* ignore */ }
+      }
+      await deleteDoc(doc(db, 'videos', id));
+      setMetas(prev => prev.filter(m => m.id !== id));
+      if (playingId === id) handleClosePlayer();
+    } catch (err) {
+      console.error('Delete failed:', err);
+      alert('삭제에 실패했습니다.');
+    }
   }
 
-  function handleSetFeaturedVideo(meta: VideoMeta) {
+  async function handleSetFeaturedVideo(meta: VideoMeta) {
     try {
-      localStorage.setItem(FEATURED_VIDEO_KEY, JSON.stringify(meta));
+      await setDoc(doc(db, 'settings', 'main'), {
+        featuredVideo: {
+          id: meta.id,
+          title: meta.title,
+          type: meta.type,
+          youtubeId: meta.youtubeId ?? null,
+          date: meta.date,
+        }
+      }, { merge: true });
       setFeaturedVideoId(meta.id);
-    } catch {
+    } catch (err) {
+      console.error('Failed to set featured video:', err);
       alert('설정 저장에 실패했습니다.');
     }
   }
 
   async function handleSubmit() {
     if (!form.title.trim()) return;
-    if (uploadType === 'youtube') {
-      const yid = extractYoutubeId(form.youtubeUrl);
-      if (!yid) { alert('올바른 YouTube URL을 입력해 주세요.'); return; }
-      const meta: VideoMeta = { id: Date.now(), title: form.title.trim(), date: form.date, grade: '', description: form.description, type: 'youtube', youtubeId: yid };
-      const next = [meta, ...metas];
-      setMetas(next); saveMeta(next);
-    } else {
-      if (!videoFile) { alert('영상 파일을 선택해 주세요.'); return; }
-      setUploading(true);
-      const id = Date.now();
-      await saveBlob(id, videoFile);
-      const meta: VideoMeta = { id, title: form.title.trim(), date: form.date, grade: '', description: form.description, type: 'upload', filename: videoFile.name };
-      const next = [meta, ...metas];
-      setMetas(next); saveMeta(next);
+    setUploading(true);
+    try {
+      if (uploadType === 'youtube') {
+        const yid = extractYoutubeId(form.youtubeUrl);
+        if (!yid) { alert('올바른 YouTube URL을 입력해 주세요.'); setUploading(false); return; }
+        const id = String(Date.now());
+        const meta: VideoMeta = {
+          id,
+          title: form.title.trim(),
+          date: form.date,
+          grade: '',
+          description: form.description,
+          type: 'youtube',
+          youtubeId: yid,
+        };
+        await setDoc(doc(db, 'videos', id), {
+          title: meta.title,
+          date: meta.date,
+          grade: meta.grade,
+          description: meta.description,
+          type: meta.type,
+          youtubeId: meta.youtubeId,
+        });
+        setMetas(prev => [meta, ...prev]);
+      } else {
+        if (!videoFile) { alert('영상 파일을 선택해 주세요.'); setUploading(false); return; }
+        const id = String(Date.now());
+        // Upload to Firebase Storage
+        const sRef = storageRef(storage, `videos/${id}`);
+        await uploadBytes(sRef, videoFile);
+        const storageURL = await getDownloadURL(sRef);
+        const meta: VideoMeta = {
+          id,
+          title: form.title.trim(),
+          date: form.date,
+          grade: '',
+          description: form.description,
+          type: 'upload',
+          filename: videoFile.name,
+          storageURL,
+        };
+        await setDoc(doc(db, 'videos', id), {
+          title: meta.title,
+          date: meta.date,
+          grade: meta.grade,
+          description: meta.description,
+          type: meta.type,
+          filename: meta.filename,
+          storageURL: meta.storageURL,
+        });
+        setMetas(prev => [meta, ...prev]);
+      }
+    } catch (err) {
+      console.error('Upload failed:', err);
+      alert('업로드에 실패했습니다.');
+    } finally {
       setUploading(false);
+      setShowUpload(false);
+      setForm({ title: '', date: new Date().toISOString().slice(0,10).replace(/-/g,'.'), description: '', youtubeUrl: '' });
+      setVideoFile(null);
     }
-    setShowUpload(false);
-    setForm({ title: '', date: new Date().toISOString().slice(0,10).replace(/-/g,'.'), description: '', youtubeUrl: '' });
-    setVideoFile(null);
   }
 
   const playingMeta = metas.find(m => m.id === playingId) ?? null;
@@ -200,143 +242,154 @@ export default function VideosPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-10">
 
-        {/* Featured player */}
-        {featured ? (
-          <div className="mb-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <div
-                className="aspect-video flex items-center justify-center relative overflow-hidden border border-white/10 cursor-pointer group"
-                style={{ backgroundColor: '#080808' }}
-                onClick={() => handlePlay(featured)}
-              >
-                {featured.type === 'youtube' ? (
-                  <YoutubeThumb yid={featured.youtubeId!} title={featured.title} />
-                ) : (
-                  <VideoThumb id={featured.id} filename={featured.filename} />
-                )}
-                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors" />
-                <button className="absolute z-10 w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl transition-transform hover:scale-110" style={{ backgroundColor: 'rgba(204,0,0,0.9)' }}>▶</button>
-                {featured.duration && (
-                  <div className="absolute bottom-3 right-3 text-xs text-white/70 px-2 py-1" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>{featured.duration}</div>
-                )}
-                <div className="absolute top-3 left-3 text-xs font-bold text-white px-2 py-1" style={{ backgroundColor: '#CC0000' }}>최신</div>
-              </div>
-              <div className="p-4" style={{ backgroundColor: '#080808' }}>
-                <div className="text-xs font-bold mb-1" style={{ color: '#CC0000' }}>{featured.date}</div>
-                <h3 className="text-white font-bold text-lg mb-1">{featured.title}</h3>
-                {featured.description && <div className="text-white/40 text-xs">{featured.description}</div>}
-              </div>
-            </div>
-
-            {/* Playlist */}
-            <div className="border border-white/10 overflow-hidden" style={{ backgroundColor: '#080808' }}>
-              <div className="px-4 py-3 border-b border-white/10 text-sm font-bold text-white/70">재생목록</div>
-              <div className="overflow-y-auto max-h-[340px]">
-                {filtered.slice(0, 8).map(v => (
-                  <button
-                    key={v.id}
-                    onClick={() => handlePlay(v)}
-                    className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors text-left"
-                    style={{ backgroundColor: playingId === v.id ? 'rgba(204,0,0,0.1)' : 'transparent' }}
-                  >
-                    <div className="w-14 h-10 flex-shrink-0 relative overflow-hidden border border-white/10" style={{ backgroundColor: '#0e0e0e' }}>
-                      {v.type === 'youtube' ? (
-                        <YoutubeThumb yid={v.youtubeId!} title={v.title} />
-                      ) : (
-                        <VideoThumb id={v.id} filename={v.filename} />
-                      )}
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-white text-xs opacity-70">▶</span>
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-white/80 text-xs font-semibold truncate">{v.title}</div>
-                      <div className="text-white/30 text-[10px] mt-0.5">{v.date}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-24 text-white/30">
+            <div className="text-center">
+              <div className="text-4xl mb-3 animate-pulse">🎬</div>
+              <div>로딩 중...</div>
             </div>
           </div>
         ) : (
-          <div className="mb-10 flex flex-col items-center justify-center py-20 text-white/20 border border-white/10" style={{ backgroundColor: '#080808' }}>
-            <div className="text-6xl mb-4">🎬</div>
-            <div className="text-lg font-bold mb-1">등록된 영상이 없습니다</div>
-            <div className="text-sm">영상 업로드 버튼을 눌러 추가해 주세요</div>
-          </div>
-        )}
-
-        {/* Upload button */}
-        <div className="flex justify-end mb-6">
-          <button
-            onClick={() => setShowUpload(true)}
-            className="sm:ml-auto px-6 py-2 text-sm font-bold text-white hover:opacity-80 transition-colors flex items-center gap-2"
-            style={{ backgroundColor: '#CC0000' }}
-          >
-            🎬 영상 업로드
-          </button>
-        </div>
-
-        {/* Video grid */}
-        {filtered.length === 0 ? (
-          <div className="text-center py-16 text-white/20 text-sm">등록된 영상이 없습니다.</div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {filtered.map(v => {
-              const isFeatured = featuredVideoId === v.id;
-              return (
-              <div key={v.id} className="relative group">
-                <div
-                  className="w-full text-left border transition-all"
-                  style={{ backgroundColor: '#080808', borderColor: isFeatured ? '#CC0000' : 'rgba(255,255,255,0.1)' }}
-                >
+          <>
+            {/* Featured player */}
+            {featured ? (
+              <div className="mb-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
                   <div
-                    className="aspect-video flex items-center justify-center relative overflow-hidden border-b border-white/5 cursor-pointer"
-                    style={{ backgroundColor: '#0e0e0e' }}
-                    onClick={() => handlePlay(v)}
+                    className="aspect-video flex items-center justify-center relative overflow-hidden border border-white/10 cursor-pointer group"
+                    style={{ backgroundColor: '#080808' }}
+                    onClick={() => handlePlay(featured)}
                   >
-                    {v.type === 'youtube' ? (
-                      <YoutubeThumb yid={v.youtubeId!} title={v.title} />
+                    {featured.type === 'youtube' ? (
+                      <YoutubeThumb yid={featured.youtubeId!} title={featured.title} />
                     ) : (
-                      <VideoThumb id={v.id} filename={v.filename} />
+                      <VideoThumb storageURL={featured.storageURL} />
                     )}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: 'rgba(204,0,0,0.9)' }}>▶</div>
-                    </div>
-                    {v.type === 'youtube' && (
-                      <div className="absolute top-1 right-1 bg-red-700 text-white text-[10px] px-1.5 py-0.5 font-bold">YT</div>
+                    <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors" />
+                    <button className="absolute z-10 w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl transition-transform hover:scale-110" style={{ backgroundColor: 'rgba(204,0,0,0.9)' }}>▶</button>
+                    {featured.duration && (
+                      <div className="absolute bottom-3 right-3 text-xs text-white/70 px-2 py-1" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>{featured.duration}</div>
                     )}
-                    {isFeatured && (
-                      <div className="absolute bottom-1 left-1 text-white text-[9px] font-black px-1.5 py-0.5 z-10" style={{ backgroundColor: '#CC0000' }}>★ 메인</div>
-                    )}
+                    <div className="absolute top-3 left-3 text-xs font-bold text-white px-2 py-1" style={{ backgroundColor: '#CC0000' }}>최신</div>
                   </div>
-                  <div className="p-3">
-                    <div className="text-white/80 text-xs font-semibold mb-1.5 line-clamp-2 leading-snug">{v.title}</div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-white/30">{v.date}</span>
-                      <button
-                        onClick={() => requireAdmin(() => handleSetFeaturedVideo(v))}
-                        className="text-[10px] font-black px-2 py-0.5 transition-colors"
-                        style={{
-                          backgroundColor: isFeatured ? 'rgba(204,0,0,0.2)' : 'rgba(255,255,255,0.07)',
-                          color: isFeatured ? '#CC0000' : 'rgba(255,255,255,0.4)',
-                        }}
-                      >
-                        {isFeatured ? '★ 메인' : '메인설정'}
-                      </button>
-                    </div>
+                  <div className="p-4" style={{ backgroundColor: '#080808' }}>
+                    <div className="text-xs font-bold mb-1" style={{ color: '#CC0000' }}>{featured.date}</div>
+                    <h3 className="text-white font-bold text-lg mb-1">{featured.title}</h3>
+                    {featured.description && <div className="text-white/40 text-xs">{featured.description}</div>}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDelete(v.id)}
-                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 text-white/50 hover:text-white hover:bg-red-800 text-xs font-bold opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
-                >
-                  ✕
-                </button>
+
+                {/* Playlist */}
+                <div className="border border-white/10 overflow-hidden" style={{ backgroundColor: '#080808' }}>
+                  <div className="px-4 py-3 border-b border-white/10 text-sm font-bold text-white/70">재생목록</div>
+                  <div className="overflow-y-auto max-h-[340px]">
+                    {filtered.slice(0, 8).map(v => (
+                      <button
+                        key={v.id}
+                        onClick={() => handlePlay(v)}
+                        className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors text-left"
+                        style={{ backgroundColor: playingId === v.id ? 'rgba(204,0,0,0.1)' : 'transparent' }}
+                      >
+                        <div className="w-14 h-10 flex-shrink-0 relative overflow-hidden border border-white/10" style={{ backgroundColor: '#0e0e0e' }}>
+                          {v.type === 'youtube' ? (
+                            <YoutubeThumb yid={v.youtubeId!} title={v.title} />
+                          ) : (
+                            <VideoThumb storageURL={v.storageURL} />
+                          )}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-white text-xs opacity-70">▶</span>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-white/80 text-xs font-semibold truncate">{v.title}</div>
+                          <div className="text-white/30 text-[10px] mt-0.5">{v.date}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              );
-            })}
-          </div>
+            ) : (
+              <div className="mb-10 flex flex-col items-center justify-center py-20 text-white/20 border border-white/10" style={{ backgroundColor: '#080808' }}>
+                <div className="text-6xl mb-4">🎬</div>
+                <div className="text-lg font-bold mb-1">등록된 영상이 없습니다</div>
+                <div className="text-sm">영상 업로드 버튼을 눌러 추가해 주세요</div>
+              </div>
+            )}
+
+            {/* Upload button */}
+            <div className="flex justify-end mb-6">
+              <button
+                onClick={() => setShowUpload(true)}
+                className="sm:ml-auto px-6 py-2 text-sm font-bold text-white hover:opacity-80 transition-colors flex items-center gap-2"
+                style={{ backgroundColor: '#CC0000' }}
+              >
+                🎬 영상 업로드
+              </button>
+            </div>
+
+            {/* Video grid */}
+            {filtered.length === 0 ? (
+              <div className="text-center py-16 text-white/20 text-sm">등록된 영상이 없습니다.</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {filtered.map(v => {
+                  const isFeatured = featuredVideoId === v.id;
+                  return (
+                  <div key={v.id} className="relative group">
+                    <div
+                      className="w-full text-left border transition-all"
+                      style={{ backgroundColor: '#080808', borderColor: isFeatured ? '#CC0000' : 'rgba(255,255,255,0.1)' }}
+                    >
+                      <div
+                        className="aspect-video flex items-center justify-center relative overflow-hidden border-b border-white/5 cursor-pointer"
+                        style={{ backgroundColor: '#0e0e0e' }}
+                        onClick={() => handlePlay(v)}
+                      >
+                        {v.type === 'youtube' ? (
+                          <YoutubeThumb yid={v.youtubeId!} title={v.title} />
+                        ) : (
+                          <VideoThumb storageURL={v.storageURL} />
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: 'rgba(204,0,0,0.9)' }}>▶</div>
+                        </div>
+                        {v.type === 'youtube' && (
+                          <div className="absolute top-1 right-1 bg-red-700 text-white text-[10px] px-1.5 py-0.5 font-bold">YT</div>
+                        )}
+                        {isFeatured && (
+                          <div className="absolute bottom-1 left-1 text-white text-[9px] font-black px-1.5 py-0.5 z-10" style={{ backgroundColor: '#CC0000' }}>★ 메인</div>
+                        )}
+                      </div>
+                      <div className="p-3">
+                        <div className="text-white/80 text-xs font-semibold mb-1.5 line-clamp-2 leading-snug">{v.title}</div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-white/30">{v.date}</span>
+                          <button
+                            onClick={() => requireAdmin(() => handleSetFeaturedVideo(v))}
+                            className="text-[10px] font-black px-2 py-0.5 transition-colors"
+                            style={{
+                              backgroundColor: isFeatured ? 'rgba(204,0,0,0.2)' : 'rgba(255,255,255,0.07)',
+                              color: isFeatured ? '#CC0000' : 'rgba(255,255,255,0.4)',
+                            }}
+                          >
+                            {isFeatured ? '★ 메인' : '메인설정'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => requireAdmin(() => handleDelete(v.id))}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 text-white/50 hover:text-white hover:bg-red-800 text-xs font-bold opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -447,7 +500,7 @@ export default function VideosPage() {
                 className="flex-1 py-2 text-sm font-bold text-white hover:opacity-80 disabled:opacity-40 transition-colors"
                 style={{ backgroundColor: '#CC0000' }}
               >
-                {uploading ? '저장 중...' : '등록'}
+                {uploading ? '업로드 중...' : '등록'}
               </button>
             </div>
           </div>

@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
+import { db, storage } from '@/lib/firebase';
+import {
+  collection, getDocs, doc, setDoc, deleteDoc, orderBy, query
+} from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // ── 이미지 압축 (canvas 리사이즈 후 JPEG 변환) ──
 function compressImage(file: File, maxDim = 600, quality = 0.8): Promise<string> {
@@ -18,10 +23,8 @@ function compressImage(file: File, maxDim = 600, quality = 0.8): Promise<string>
       const canvas = document.createElement('canvas');
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d')!;
-      // 투명 배경 유지: clearRect로 초기화 후 그림 (JPEG 대신 PNG 사용)
       ctx.clearRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
-      // PNG: 투명 배경 보존 / JPEG: 배경이 검정으로 변환되므로 PNG 우선
       const isPng = file.type === 'image/png';
       resolve(isPng
         ? canvas.toDataURL('image/png')
@@ -34,41 +37,21 @@ function compressImage(file: File, maxDim = 600, quality = 0.8): Promise<string>
 
 type PosKey = 'GK' | 'DF' | 'MF' | 'FW';
 type Player = {
-  id: number;
+  id: string;
   no: number;
   name: string;
-  pos: string; // 복수 선택 시 첫 번째 포지션 (카드 테마용)
-  positions: PosKey[]; // 전체 포지션 목록
+  pos: string;
+  positions: PosKey[];
   grade: '3학년';
   stats: { spd: number; sht: number; pas: number; dri: number; def: number; phy: number };
-  photo?: string;
-  modelPhoto?: string;
+  photo?: string;       // preview (local dataURL or storage URL)
+  modelPhoto?: string;  // preview (local dataURL or storage URL)
+  photoURL?: string | null;       // Firebase Storage URL
+  modelPhotoURL?: string | null;  // Firebase Storage URL
 };
 
-const STORAGE_KEY = 'taes-players-v2';
-
 const posColors: Record<string, string> = { GK: '#7C3AED', DF: '#059669', MF: '#2563EB', FW: '#DC2626' };
-const GRADE_COLOR: Record<string, string> = { '3학년': '#CC0000' };
 
-function getCardColors(pos: string) {
-  const c = posColors[pos] ?? '#CC0000';
-  return { from: c, card: '#080808' };
-}
-
-function StatBar({ value, label }: { value: number; label: string }) {
-  const color = value >= 78 ? '#22c55e' : value >= 62 ? '#eab308' : '#ef4444';
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-[10px] font-black text-white/40 w-7">{label}</span>
-      <div className="flex-1 h-1.5 rounded-full bg-white/10">
-        <div className="h-full rounded-full" style={{ width: `${value}%`, backgroundColor: color }} />
-      </div>
-      <span className="text-[11px] font-black w-5 text-right" style={{ color }}>{value}</span>
-    </div>
-  );
-}
-
-// 포지션별 카드 테마 — 배경은 사이트 톤(다크 블랙/레드) 통일, 포지션은 테두리·액센트만
 const cardThemes: Record<string, { bg: string; accent: string; border: string; glow: string; stripe: string }> = {
   GK: {
     bg: 'linear-gradient(160deg,#0a0800 0%,#1a1000 40%,#050505 100%)',
@@ -96,9 +79,24 @@ const cardThemes: Record<string, { bg: string; accent: string; border: string; g
   },
 };
 
+function StatBar({ value, label }: { value: number; label: string }) {
+  const color = value >= 78 ? '#22c55e' : value >= 62 ? '#eab308' : '#ef4444';
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] font-black text-white/40 w-7">{label}</span>
+      <div className="flex-1 h-1.5 rounded-full bg-white/10">
+        <div className="h-full rounded-full" style={{ width: `${value}%`, backgroundColor: color }} />
+      </div>
+      <span className="text-[11px] font-black w-5 text-right" style={{ color }}>{value}</span>
+    </div>
+  );
+}
+
 function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) {
   const theme = cardThemes[player.pos] ?? cardThemes.FW;
-  const hasBack = !!player.modelPhoto;
+  const photoSrc = player.photo || player.photoURL || undefined;
+  const modelSrc = player.modelPhoto || player.modelPhotoURL || undefined;
+  const hasBack = !!modelSrc;
   const ovr = Math.round((player.stats.spd + player.stats.sht + player.stats.pas + player.stats.dri + player.stats.def + player.stats.phy) / 6);
   const stats = [
     { k: 'PAC', v: player.stats.spd },
@@ -141,7 +139,6 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
             pointerEvents: 'none',
           }} />
 
-          {/* ── 배경 레이어들 ── */}
           {/* 대각선 스트라이프 */}
           <div style={{
             position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
@@ -150,14 +147,11 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
 
           {/* 홀로그래픽 원형 + 방사선 SVG */}
           <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-            {/* 큰 글로우 원 */}
             <circle cx="50%" cy="35%" r="90" fill={`${theme.glow}22`} />
             <circle cx="50%" cy="35%" r="60" fill={`${theme.glow}15`} />
-            {/* 동심원 */}
             {[45, 75, 105, 140, 175, 210].map(r => (
               <circle key={r} cx="50%" cy="35%" r={r} fill="none" stroke={theme.accent} strokeWidth="0.6" opacity="0.2" />
             ))}
-            {/* 방사선 */}
             {Array.from({length: 16}, (_, i) => i * 22.5).map(deg => {
               const rad = (deg * Math.PI) / 180;
               return <line key={deg} x1="50%" y1="35%"
@@ -165,14 +159,13 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
                 y2={`calc(35% + ${220 * Math.sin(rad)}px)`}
                 stroke={theme.accent} strokeWidth="0.4" opacity="0.12" />;
             })}
-            {/* 별 장식들 */}
             {[
               { x: '15%', y: '12%', size: 6 }, { x: '82%', y: '8%', size: 8 },
               { x: '88%', y: '22%', size: 5 }, { x: '10%', y: '28%', size: 4 },
               { x: '90%', y: '55%', size: 5 }, { x: '8%', y: '60%', size: 4 },
               { x: '20%', y: '72%', size: 3 }, { x: '78%', y: '70%', size: 4 },
             ].map((s, i) => (
-              <g key={i} transform={`translate(${s.x === s.x ? 0 : 0}, 0)`}>
+              <g key={i}>
                 <text x={s.x} y={s.y} fontSize={s.size * 2} fill={theme.accent} opacity="0.6" textAnchor="middle">✦</text>
               </g>
             ))}
@@ -198,9 +191,9 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
             display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
             zIndex: 5,
           }}>
-            {player.photo ? (
+            {photoSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={player.photo} alt={player.name} style={{
+              <img src={photoSrc} alt={player.name} style={{
                 maxHeight: '100%', maxWidth: '100%', objectFit: 'contain',
               }} />
             ) : (
@@ -234,9 +227,7 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
             padding: '32px 10px 10px',
             borderRadius: '0 0 12px 12px',
           }}>
-            {/* 구분선 */}
             <div style={{ height: '1px', background: `linear-gradient(to right, transparent, ${theme.accent}90, transparent)`, marginBottom: 7 }} />
-            {/* 이름 + 등번호 */}
             <div style={{ textAlign: 'center', marginBottom: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 900, color: '#fff',
                 letterSpacing: '0.05em',
@@ -254,7 +245,6 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
                   textShadow: `0 0 10px ${theme.glow}, 0 1px 3px rgba(0,0,0,0.8)` }}>{player.no}</span>
               </div>
             </div>
-            {/* 스탯 6개 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '4px 2px' }}>
               {stats.map(({ k, v }) => (
                 <div key={k} style={{ textAlign: 'center' }}>
@@ -270,7 +260,7 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
           </div>
         </div>
 
-        {/* ── 뒷면 (3D 유니폼 사진 있을 때만) ── */}
+        {/* ── 뒷면 ── */}
         {hasBack && (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden"
@@ -282,7 +272,6 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
               boxShadow: `0 8px 32px rgba(0,0,0,0.8)`,
             }}
           >
-            {/* 메탈릭 테두리 */}
             <div style={{
               position: 'absolute', inset: 0, borderRadius: '12px',
               background: theme.border,
@@ -293,7 +282,7 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
             }} />
             <div className="text-[9px] font-black tracking-widest mb-2 z-10" style={{ color: theme.accent }}>TAES FC PREMIER</div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={player.modelPhoto} alt="3D" className="z-10" style={{ width: '80%', objectFit: 'contain' }} />
+            <img src={modelSrc} alt="3D" className="z-10" style={{ width: '80%', objectFit: 'contain' }} />
             <div className="mt-2 text-center z-10">
               <div className="text-white font-black text-sm">{player.name}</div>
               <div className="text-[11px] font-bold mt-0.5" style={{ color: theme.accent }}>No.{player.no} · {(player.positions ?? [player.pos]).join('·')}</div>
@@ -312,8 +301,8 @@ const emptyForm = {
   positions: ['FW'] as PosKey[],
   grade: '3학년' as Player['grade'],
   spd: '', sht: '', pas: '', dri: '', def: '', phy: '',
-  photo: '',
-  modelPhoto: '',
+  photo: '',       // local dataURL (preview)
+  modelPhoto: '',  // local dataURL (preview)
 };
 type FormState = typeof emptyForm;
 
@@ -324,21 +313,24 @@ function playerToForm(p: Player): FormState {
     grade: p.grade,
     spd: String(p.stats.spd), sht: String(p.stats.sht), pas: String(p.stats.pas),
     dri: String(p.stats.dri), def: String(p.stats.def), phy: String(p.stats.phy),
-    photo: p.photo ?? '',
-    modelPhoto: p.modelPhoto ?? '',
+    photo: p.photo || p.photoURL || '',
+    modelPhoto: p.modelPhoto || p.modelPhotoURL || '',
   };
 }
-function formToPlayer(f: FormState, id: number): Player {
-  const positions = f.positions.length ? f.positions : ['FW' as PosKey];
-  return {
-    id, no: Number(f.no), name: f.name,
-    pos: positions[0],
-    positions,
-    grade: f.grade,
-    stats: { spd: Number(f.spd), sht: Number(f.sht), pas: Number(f.pas), dri: Number(f.dri), def: Number(f.def), phy: Number(f.phy) },
-    photo: f.photo || undefined,
-    modelPhoto: f.modelPhoto || undefined,
-  };
+
+async function uploadPlayerImage(dataUrl: string, playerId: string, filename: string): Promise<string> {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  const sRef = storageRef(storage, `players/${playerId}/${filename}`);
+  await uploadBytes(sRef, blob);
+  return getDownloadURL(sRef);
+}
+
+async function deletePlayerImage(playerId: string, filename: string) {
+  try {
+    const sRef = storageRef(storage, `players/${playerId}/${filename}`);
+    await deleteObject(sRef);
+  } catch { /* ignore */ }
 }
 
 const iCls = "w-full px-3 py-2 bg-[#0e0e0e] border border-white/10 text-white text-sm focus:border-red-700 outline-none";
@@ -379,6 +371,7 @@ function PlayersContent() {
   const { requireAdmin, modal: adminModal } = useAdminAuth();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [activeGrade, setActiveGrade] = useState<'전체' | '3학년'>('전체');
   const [search, setSearch] = useState('');
   const [activePos, setActivePos] = useState('전체');
@@ -391,19 +384,35 @@ function PlayersContent() {
   const modelFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    setPlayers(saved ? JSON.parse(saved) : []);
-    setLoading(false);
-  }, []);
-
-  const save = (updated: Player[]) => {
-    setPlayers(updated);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch {
-      alert('저장 공간이 부족합니다. 사진 용량을 줄여주세요.');
+    async function loadPlayers() {
+      try {
+        const q = query(collection(db, 'players'), orderBy('no'));
+        const snapshot = await getDocs(q);
+        const loaded: Player[] = snapshot.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            no: data.no,
+            name: data.name,
+            pos: data.pos,
+            positions: data.positions ?? [data.pos],
+            grade: data.grade,
+            stats: data.stats,
+            photoURL: data.photoURL ?? null,
+            modelPhotoURL: data.modelPhotoURL ?? null,
+            photo: data.photoURL ?? undefined,
+            modelPhoto: data.modelPhotoURL ?? undefined,
+          } as Player;
+        });
+        setPlayers(loaded);
+      } catch (err) {
+        console.error('Failed to load players:', err);
+      } finally {
+        setLoading(false);
+      }
     }
-  };
+    loadPlayers();
+  }, []);
 
   const sf = (key: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -423,31 +432,93 @@ function PlayersContent() {
     setForm(f => ({ ...f, modelPhoto: compressed }));
   };
 
-
   const openEdit = (p: Player) => requireAdmin(() => { setForm(playerToForm(p)); setEditMode(true); setAddMode(false); });
   const openAdd  = () => requireAdmin(() => { setForm(emptyForm); setAddMode(true); setEditMode(false); setSelected(null); });
   const closeModal = () => { setSelected(null); setEditMode(false); setAddMode(false); setDeleteTarget(null); };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editMode && selected) {
-      const updatedPlayer = formToPlayer(form, selected.id);
-      const updated = players.map(p => p.id === selected.id ? updatedPlayer : p);
-      save(updated);
-      setEditMode(false);
-      setAddMode(false);
-      setSelected(updatedPlayer);
-    } else if (addMode) {
-      const newId = Math.max(0, ...players.map(p => p.id)) + 1;
-      save([...players, formToPlayer(form, newId)]);
-      closeModal();
+    setSaving(true);
+    try {
+      const positions = form.positions.length ? form.positions : ['FW' as PosKey];
+      const playerId = editMode && selected ? selected.id : String(Date.now());
+
+      // Upload photos if they are local dataURLs
+      let photoURL: string | null = null;
+      let modelPhotoURL: string | null = null;
+
+      if (form.photo && form.photo.startsWith('data:')) {
+        photoURL = await uploadPlayerImage(form.photo, playerId, 'photo.jpg');
+      } else if (form.photo) {
+        photoURL = form.photo; // already a URL
+      } else if (editMode && selected) {
+        photoURL = selected.photoURL ?? null;
+      }
+
+      if (form.modelPhoto && form.modelPhoto.startsWith('data:')) {
+        modelPhotoURL = await uploadPlayerImage(form.modelPhoto, playerId, 'modelPhoto.png');
+      } else if (form.modelPhoto) {
+        modelPhotoURL = form.modelPhoto; // already a URL
+      } else if (editMode && selected) {
+        modelPhotoURL = selected.modelPhotoURL ?? null;
+      }
+
+      const playerData = {
+        no: Number(form.no),
+        name: form.name,
+        pos: positions[0],
+        positions,
+        grade: form.grade,
+        stats: {
+          spd: Number(form.spd), sht: Number(form.sht), pas: Number(form.pas),
+          dri: Number(form.dri), def: Number(form.def), phy: Number(form.phy),
+        },
+        photoURL: photoURL ?? null,
+        modelPhotoURL: modelPhotoURL ?? null,
+      };
+
+      await setDoc(doc(db, 'players', playerId), playerData);
+
+      const updatedPlayer: Player = {
+        ...playerData,
+        id: playerId,
+        photo: photoURL ?? undefined,
+        modelPhoto: modelPhotoURL ?? undefined,
+      };
+
+      if (editMode && selected) {
+        setPlayers(prev => prev.map(p => p.id === selected.id ? updatedPlayer : p));
+        setEditMode(false);
+        setAddMode(false);
+        setSelected(updatedPlayer);
+      } else {
+        setPlayers(prev => [...prev, updatedPlayer]);
+        closeModal();
+      }
+    } catch (err) {
+      console.error('Save failed:', err);
+      alert('저장에 실패했습니다. 다시 시도해 주세요.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
-    save(players.filter(p => p.id !== deleteTarget.id));
-    closeModal();
+    setSaving(true);
+    try {
+      await deleteDoc(doc(db, 'players', deleteTarget.id));
+      // Delete storage images
+      if (deleteTarget.photoURL) await deletePlayerImage(deleteTarget.id, 'photo.jpg');
+      if (deleteTarget.modelPhotoURL) await deletePlayerImage(deleteTarget.id, 'modelPhoto.png');
+      setPlayers(prev => prev.filter(p => p.id !== deleteTarget.id));
+      closeModal();
+    } catch (err) {
+      console.error('Delete failed:', err);
+      alert('삭제에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filtered = players.filter(p => {
@@ -456,7 +527,6 @@ function PlayersContent() {
     return mg && mp && p.name.includes(search);
   });
 
-  const count3 = players.filter(p => p.grade === '3학년').length;
   const showForm = editMode || addMode;
 
   return (
@@ -573,12 +643,11 @@ function PlayersContent() {
                       </div>
                     ))}
                   </div>
-                  {/* 개인 3D 유니폼 이미지 */}
-                  {selected.modelPhoto && (
+                  {(selected.modelPhoto || selected.modelPhotoURL) && (
                     <div className="flex justify-center mt-6" style={{ backgroundColor: 'transparent' }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={selected.modelPhoto}
+                        src={selected.modelPhoto || selected.modelPhotoURL!}
                         alt="3D 유니폼"
                         style={{ width: 240, height: 240, objectFit: 'contain', backgroundColor: 'transparent' }}
                       />
@@ -681,7 +750,7 @@ function PlayersContent() {
                     <label className={lCls}>포지션 * <span className="text-white/25 font-normal normal-case">(복수 선택 가능)</span></label>
                     <div className="flex gap-2 mt-1">
                       {ALL_POS.map(p => {
-                        const selected = form.positions.includes(p);
+                        const sel = form.positions.includes(p);
                         return (
                           <button
                             key={p} type="button"
@@ -695,10 +764,10 @@ function PlayersContent() {
                             }}
                             className="flex-1 py-2 text-xs font-black transition-all"
                             style={{
-                              backgroundColor: selected ? posColors[p] : '#0e0e0e',
-                              color: selected ? '#fff' : 'rgba(255,255,255,0.35)',
-                              border: `1px solid ${selected ? posColors[p] : 'rgba(255,255,255,0.1)'}`,
-                              boxShadow: selected ? `0 0 8px ${posColors[p]}60` : 'none',
+                              backgroundColor: sel ? posColors[p] : '#0e0e0e',
+                              color: sel ? '#fff' : 'rgba(255,255,255,0.35)',
+                              border: `1px solid ${sel ? posColors[p] : 'rgba(255,255,255,0.1)'}`,
+                              boxShadow: sel ? `0 0 8px ${posColors[p]}60` : 'none',
                             }}
                           >{p}</button>
                         );
@@ -725,10 +794,10 @@ function PlayersContent() {
                     className="flex-1 py-3 font-bold text-white/50 border border-white/20 hover:border-white/40 transition-colors text-sm">
                     취소
                   </button>
-                  <button type="submit"
-                    className="flex-1 py-3 font-bold text-white hover:opacity-80 transition-opacity text-sm"
+                  <button type="submit" disabled={saving}
+                    className="flex-1 py-3 font-bold text-white hover:opacity-80 transition-opacity text-sm disabled:opacity-50"
                     style={{ backgroundColor: '#CC0000' }}>
-                    {addMode ? '등록 완료' : '수정 완료'}
+                    {saving ? '저장 중...' : addMode ? '등록 완료' : '수정 완료'}
                   </button>
                 </div>
               </form>
@@ -750,10 +819,10 @@ function PlayersContent() {
                 className="flex-1 py-2.5 font-bold text-white/50 border border-white/20 hover:border-white/40 transition-colors text-sm">
                 취소
               </button>
-              <button onClick={handleDelete}
-                className="flex-1 py-2.5 font-bold text-white hover:opacity-80 transition-opacity text-sm"
+              <button onClick={handleDelete} disabled={saving}
+                className="flex-1 py-2.5 font-bold text-white hover:opacity-80 transition-opacity text-sm disabled:opacity-50"
                 style={{ backgroundColor: '#dc2626' }}>
-                삭제
+                {saving ? '삭제 중...' : '삭제'}
               </button>
             </div>
           </div>
