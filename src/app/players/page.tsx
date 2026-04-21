@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
+import SearchPlayerCard from '@/components/SearchPlayerCard';
 import { db } from '@/lib/firebase';
 import {
   collection, getDocs, getDoc, doc, setDoc, deleteDoc, orderBy, query
@@ -878,6 +879,7 @@ function PlayersContent() {
             {filtered.map(p => (
               <FifaCard key={p.id} player={p} onClick={() => { setSelected(p); setEditMode(false); }} />
             ))}
+            <SearchPlayerCard />
           </div>
         )}
       </div>
