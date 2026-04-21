@@ -6,14 +6,218 @@ import HeroAnimation from '@/components/HeroAnimation';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, orderBy, query, limit } from 'firebase/firestore';
 
+type StaffCard = {
+  id: string; name: string; role: string; career: string; order: number; photoURL: string | null;
+};
 
-const schedule = [
-  { date: '04.12', day: '토', home: 'TAES FC', away: '드래곤 FC', venue: '○○구장', grade: '3학년', result: null },
-  { date: '04.19', day: '토', home: 'TAES FC', away: '스타 유나이티드', venue: '△△구장', grade: '3학년', result: null },
-  { date: '04.26', day: '일', home: '블루 FC', away: 'TAES FC', venue: '□□구장', grade: '3학년', result: null },
-  { date: '03.29', day: '토', home: 'TAES FC', away: '레드 스타', venue: '○○구장', grade: '3학년', result: '3 : 1' },
-  { date: '03.22', day: '토', home: '그린 FC', away: 'TAES FC', venue: '△△구장', grade: '3학년', result: '1 : 2' },
-];
+function MiniStaffCard({ s }: { s: StaffCard }) {
+  const isManager = s.role === '감독';
+  const gold = { base:'#ffe066', glow:'#f5b800', border:'#a86800', borderHi:'#ffe066', mid:'rgba(255,200,0,0.08)' };
+  return (
+    <Link href="/about/staff" className="block flex-shrink-0" style={{ width: 110 }}>
+      <div className="relative overflow-hidden"
+        style={{
+          aspectRatio: '3/4.2', borderRadius: 12,
+          background: 'linear-gradient(155deg,#140e00 0%,#060400 50%,#000 100%)',
+          boxShadow: `0 2px 0 ${gold.border}, 0 8px 32px rgba(0,0,0,0.95)`,
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-5px) scale(1.03)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'none'; }}
+      >
+        {/* 카본 파이버 패턴 */}
+        <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', pointerEvents:'none' }}>
+          <defs>
+            <pattern id={`cf-s-${s.id}`} x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+              <rect width="4" height="4" fill="transparent"/>
+              <rect x="0" y="0" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
+              <rect x="2" y="2" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
+            </pattern>
+            <radialGradient id={`cg-s-${s.id}`} cx="50%" cy="38%" r="52%">
+              <stop offset="0%" stopColor={gold.glow} stopOpacity="0.18"/>
+              <stop offset="100%" stopColor={gold.glow} stopOpacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="100%" height="100%" fill={`url(#cf-s-${s.id})`}/>
+          <ellipse cx="50%" cy="38%" rx="58%" ry="48%" fill={`url(#cg-s-${s.id})`}/>
+        </svg>
+        {/* 광택 */}
+        <div style={{ position:'absolute', inset:0, pointerEvents:'none', borderRadius:12,
+          background:'linear-gradient(128deg,rgba(255,255,255,0.09) 0%,rgba(255,255,255,0.02) 28%,transparent 52%)' }}/>
+        {/* 골드 테두리 */}
+        <div style={{ position:'absolute', inset:0, borderRadius:12, zIndex:22, pointerEvents:'none',
+          background:`linear-gradient(145deg,${gold.borderHi} 0%,rgba(255,255,255,0.5) 18%,${gold.glow} 38%,${gold.border} 62%,${gold.borderHi}44 85%,${gold.border} 100%)`,
+          padding:'1.5px', WebkitMask:'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+          WebkitMaskComposite:'xor', maskComposite:'exclude' }}/>
+        {/* 상단 골드 라인 */}
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:2, zIndex:25, pointerEvents:'none',
+          background:`linear-gradient(90deg,transparent,${gold.border} 12%,${gold.glow} 32%,rgba(255,240,180,0.9) 50%,${gold.glow} 68%,${gold.border} 88%,transparent)`,
+          borderRadius:'12px 12px 0 0' }}/>
+        {/* TAES 로고 워터마크 */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/taes-logo.png" alt="" aria-hidden style={{ position:'absolute', top:'50%', left:'50%',
+          transform:'translate(-50%,-52%)', width:'78%', pointerEvents:'none',
+          opacity:0.22, filter:'grayscale(1) brightness(2)', zIndex:2 }}/>
+        {/* 상단 좌측: MANAGER 뱃지 */}
+        <div style={{ position:'absolute', top:7, left:8, zIndex:15 }}>
+          <div style={{ fontSize:7, fontWeight:900, color:gold.base, backgroundColor:gold.glow,
+            padding:'2px 5px', borderRadius:2, letterSpacing:'0.05em',
+            boxShadow:`0 0 8px ${gold.glow}80` }}>{isManager ? 'MANAGER' : s.role}</div>
+        </div>
+        {/* TAES FC */}
+        <div style={{ position:'absolute', top:7, right:7, textAlign:'right', zIndex:15 }}>
+          <div style={{ fontSize:7.5, fontWeight:900, color:gold.base, letterSpacing:'0.1em', opacity:0.9 }}>TAES</div>
+          <div style={{ fontSize:5.5, fontWeight:700, color:'rgba(255,255,255,0.28)', letterSpacing:'0.1em', marginTop:1 }}>FC</div>
+        </div>
+        {/* 사진 */}
+        <div style={{ position:'absolute', bottom:'20%', left:'50%', transform:'translateX(-50%)',
+          width:'90%', height:'60%', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:10 }}>
+          {s.photoURL ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={s.photoURL} alt={s.name} style={{ maxHeight:'100%', maxWidth:'100%', objectFit:'contain',
+              filter:`drop-shadow(0 3px 12px rgba(0,0,0,0.95)) drop-shadow(0 0 8px ${gold.glow}30)` }}/>
+          ) : (
+            <div style={{ fontSize:28, fontWeight:900, color:gold.glow, opacity:0.5,
+              textShadow:`0 0 20px ${gold.glow}` }}>★</div>
+          )}
+        </div>
+        {/* 하단 이름 패널 */}
+        <div style={{ position:'absolute', bottom:0, left:0, right:0, zIndex:15,
+          background:'linear-gradient(to top,rgba(0,0,0,0.97) 0%,rgba(0,0,0,0.85) 55%,transparent 100%)',
+          padding:'18px 7px 7px', borderRadius:'0 0 12px 12px' }}>
+          <div style={{ height:1, marginBottom:5,
+            background:`linear-gradient(to right,transparent,${gold.border} 10%,${gold.base} 32%,rgba(255,240,180,0.7) 50%,${gold.base} 68%,${gold.border} 90%,transparent)`,
+            boxShadow:`0 0 4px ${gold.glow}45` }}/>
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:'0.04em',
+              textShadow:`0 0 10px ${gold.glow}55` }}>{s.name}</div>
+            <div style={{ fontSize:8, fontWeight:700, color:gold.base, marginTop:2, opacity:0.7 }}>{s.role}</div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+type PlayerCard = {
+  id: string; no: number; name: string;
+  pos: string; positions: string[];
+  honorary: boolean;
+  photo?: string; photoURL?: string | null;
+  stats: { spd: number; sht: number; pas: number; dri: number; def: number; phy: number };
+};
+
+function MiniCard({ p }: { p: PlayerCard }) {
+  const s = p.stats ?? { spd: 0, sht: 0, pas: 0, dri: 0, def: 0, phy: 0 };
+  const ovr = Math.round((s.spd + s.sht + s.pas + s.dri + s.def + s.phy) / 6);
+  const photo = p.photo || p.photoURL || undefined;
+  const pos = (p.positions?.length ? p.positions : [p.pos]).join('·');
+  return (
+    <Link href="/players" className="block flex-shrink-0" style={{ width: 110 }}>
+      <div className="relative overflow-hidden"
+        style={{
+          aspectRatio: '3/4.2', borderRadius: 12,
+          background: 'linear-gradient(155deg,#140000 0%,#060000 50%,#000 100%)',
+          boxShadow: '0 2px 0 #7a0000, 0 8px 32px rgba(0,0,0,0.95)',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-5px) scale(1.03)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 0 #7a0000, 0 16px 40px rgba(0,0,0,0.98)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'none'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 0 #7a0000, 0 8px 32px rgba(0,0,0,0.95)'; }}
+      >
+        {/* 카본 파이버 패턴 */}
+        <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', pointerEvents:'none' }}>
+          <defs>
+            <pattern id={`cf-m-${p.id}`} x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+              <rect width="4" height="4" fill="transparent"/>
+              <rect x="0" y="0" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
+              <rect x="2" y="2" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
+            </pattern>
+            <radialGradient id={`cg-m-${p.id}`} cx="50%" cy="38%" r="52%">
+              <stop offset="0%" stopColor="#bb0000" stopOpacity="0.15"/>
+              <stop offset="100%" stopColor="#bb0000" stopOpacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="100%" height="100%" fill={`url(#cf-m-${p.id})`}/>
+          <ellipse cx="50%" cy="38%" rx="58%" ry="48%" fill={`url(#cg-m-${p.id})`}/>
+        </svg>
+        {/* 경사 광택 */}
+        <div style={{ position:'absolute', inset:0, pointerEvents:'none', borderRadius:12,
+          background:'linear-gradient(128deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.02) 28%, transparent 52%)' }}/>
+        {/* 테두리 */}
+        <div style={{ position:'absolute', inset:0, borderRadius:12, zIndex:22, pointerEvents:'none',
+          background:'linear-gradient(145deg,#ff4444 0%,rgba(255,255,255,0.5) 18%,#dc2626 38%,#7a0000 62%,#ff444444 85%,#7a0000 100%)',
+          padding:'1.5px', WebkitMask:'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+          WebkitMaskComposite:'xor', maskComposite:'exclude' }}/>
+        {/* 상단 라인 */}
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:2, zIndex:25, pointerEvents:'none',
+          background:'linear-gradient(90deg,transparent,#7a0000 12%,#dc2626 32%,rgba(255,180,180,0.9) 50%,#dc2626 68%,#7a0000 88%,transparent)',
+          borderRadius:'12px 12px 0 0' }}/>
+        {/* TAES 로고 워터마크 */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/taes-logo.png" alt="" aria-hidden style={{ position:'absolute', top:'50%', left:'50%',
+          transform:'translate(-50%,-52%)', width:'78%', pointerEvents:'none',
+          opacity:0.22, filter:'grayscale(1) brightness(2)', zIndex:2 }}/>
+        {/* 상단 좌측: OVR + 포지션 */}
+        <div style={{ position:'absolute', top:7, left:8, zIndex:15 }}>
+          <div style={{ fontSize:20, fontWeight:900, color:'#fff', lineHeight:1,
+            textShadow:'0 0 12px #bb0000, 0 2px 6px rgba(0,0,0,0.9)' }}>{ovr}</div>
+          <div style={{ fontSize:7.5, fontWeight:900, color:'#ff5252', letterSpacing:'0.06em', marginTop:1,
+            textShadow:'0 0 7px #bb0000' }}>{pos}</div>
+          {p.honorary && (
+            <div style={{ marginTop:3, fontSize:5.5, fontWeight:900, color:'#fbbf24',
+              border:'1px solid #fbbf2460', padding:'1px 3px', borderRadius:2,
+              textShadow:'0 0 5px #d4a01770' }}>★ 명예회원</div>
+          )}
+        </div>
+        {/* TAES FC */}
+        <div style={{ position:'absolute', top:7, right:7, textAlign:'right', zIndex:15 }}>
+          <div style={{ fontSize:7.5, fontWeight:900, color:'#ff5252', letterSpacing:'0.1em', opacity:0.85 }}>TAES</div>
+          <div style={{ fontSize:5.5, fontWeight:700, color:'rgba(255,255,255,0.28)', letterSpacing:'0.1em', marginTop:1 }}>FC</div>
+        </div>
+        {/* 선수 사진 */}
+        <div style={{ position:'absolute', bottom:'20%', left:'50%', transform:'translateX(-50%)',
+          width:'90%', height:'60%', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:10 }}>
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo} alt={p.name} style={{ maxHeight:'100%', maxWidth:'100%', objectFit:'contain',
+              filter:'drop-shadow(0 3px 12px rgba(0,0,0,0.95)) drop-shadow(0 0 8px #bb000030)' }}/>
+          ) : (
+            <div style={{ fontSize:26, fontWeight:900, color:'#dc2626', opacity:0.4,
+              textShadow:'0 0 20px #bb0000' }}>#{p.no}</div>
+          )}
+        </div>
+        {/* 하단 이름 패널 */}
+        <div style={{ position:'absolute', bottom:0, left:0, right:0, zIndex:15,
+          background:'linear-gradient(to top,rgba(0,0,0,0.97) 0%,rgba(0,0,0,0.85) 55%,transparent 100%)',
+          padding:'18px 7px 7px', borderRadius:'0 0 12px 12px' }}>
+          <div style={{ height:1, marginBottom:5,
+            background:'linear-gradient(to right,transparent,#7a0000 10%,#ff5252 32%,rgba(255,200,200,0.7) 50%,#ff5252 68%,#7a0000 90%,transparent)',
+            boxShadow:'0 0 4px #bb000045' }}/>
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:'0.04em',
+              textShadow:'0 0 10px #bb000055' }}>{p.name}</div>
+            <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.35)', marginTop:2 }}>No.{p.no}</div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+
+type MatchItem = {
+  id: string;
+  date: string;
+  day: string;
+  home: string;
+  away: string;
+  venue: string;
+  grade: string;
+  result: '승' | '무' | '패' | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  time: string;
+};
 
 const stats = [
   { label: '등록 선수', value: '22', unit: '명' },
@@ -39,18 +243,50 @@ export default function Home() {
   const [notices, setNotices] = useState<{ id: string; category: string; title: string; date: string; views: number }[]>([]);
   const [featuredPhoto, setFeaturedPhoto] = useState<string | null>(null);
   const [featuredVideo, setFeaturedVideo] = useState<{ id: string; title: string; type: 'upload' | 'youtube'; youtubeId?: string; date: string } | null>(null);
+  const [matches, setMatches] = useState<MatchItem[]>([]);
+  const [nextMatch, setNextMatch] = useState<MatchItem | null>(null);
+  const [players, setPlayers] = useState<PlayerCard[]>([]);
+  const [manager, setManager] = useState<StaffCard | null>(null);
+  const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadData() {
       try {
-        // Load player counts
-        const playersSnap = await getDocs(collection(db, 'players'));
+        // Load players
+        const pq = query(collection(db, 'players'), orderBy('no', 'asc'));
+        const playersSnap = await getDocs(pq);
         const counts: Record<string, number> = { '3학년': 0 };
+        const loadedPlayers: PlayerCard[] = [];
         playersSnap.forEach(d => {
-          const grade = d.data().grade;
+          const data = d.data();
+          const grade = data.grade;
           if (grade in counts) counts[grade]++;
+          loadedPlayers.push({
+            id: d.id, ...data,
+            stats: data.stats ?? { spd: 0, sht: 0, pas: 0, dri: 0, def: 0, phy: 0 },
+          } as PlayerCard);
         });
         setGradeCounts(counts);
+        setPlayers(loadedPlayers);
+
+        // Load manager (감독) from staff collection
+        const staffSnap = await getDocs(query(collection(db, 'staff'), orderBy('order', 'asc')));
+        const mgr = staffSnap.docs.find(d => d.data().role === '감독');
+        if (mgr) setManager({ id: mgr.id, ...mgr.data() } as StaffCard);
+
+        // Load latest gallery photos (최대 6장)
+        const albumSnap = await getDocs(query(collection(db, 'albums'), orderBy('date', 'desc')));
+        const photos: string[] = [];
+        for (const albumDoc of albumSnap.docs) {
+          const items = albumDoc.data().items as { url: string }[] | undefined;
+          if (items) {
+            for (const item of items) {
+              if (item.url) { photos.push(item.url); if (photos.length >= 6) break; }
+            }
+          }
+          if (photos.length >= 6) break;
+        }
+        setGalleryPhotos(photos);
       } catch { /* ignore */ }
 
       try {
@@ -65,6 +301,23 @@ export default function Home() {
           views: d.data().views ?? 0,
         }));
         setNotices(loaded);
+      } catch { /* ignore */ }
+
+      try {
+        // Load matches from Firestore
+        const mq = query(collection(db, 'matches'), orderBy('date', 'desc'), limit(10));
+        const msnap = await getDocs(mq);
+        const loadedMatches: MatchItem[] = msnap.docs.map(d => ({
+          id: d.id,
+          ...(d.data() as Omit<MatchItem, 'id'>),
+        }));
+        setMatches(loadedMatches);
+        // Find next upcoming match (no result yet, soonest date)
+        const today = new Date().toISOString().split('T')[0];
+        const upcoming = loadedMatches
+          .filter(m => !m.result && m.date >= today)
+          .sort((a, b) => a.date.localeCompare(b.date));
+        setNextMatch(upcoming[0] ?? null);
       } catch { /* ignore */ }
 
       try {
@@ -229,6 +482,28 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ─── 선수 카드 섹션 ─── */}
+      {players.length > 0 && (
+        <section style={{ backgroundColor: '#050505', borderTop: '1px solid rgba(204,0,0,0.2)' }}>
+          <div className="max-w-7xl mx-auto px-4 py-10">
+            <div className="flex items-end justify-between mb-6">
+              <div>
+                <div className="text-xs font-black tracking-widest mb-2" style={{ color: '#CC0000' }}>OUR SQUAD</div>
+                <h2 className="text-3xl font-black text-white leading-none">선수단</h2>
+                <div className="mt-2 h-0.5 w-12" style={{ backgroundColor: '#CC0000' }} />
+              </div>
+              <Link href="/players" className="text-sm font-bold tracking-wider hover:text-red-500 transition-colors" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                전체보기 →
+              </Link>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {manager && <MiniStaffCard key={manager.id} s={manager} />}
+              {players.map(p => <MiniCard key={p.id} p={p} />)}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ─── MAIN CONTENT ─── */}
       <div className="max-w-7xl mx-auto px-4 py-16">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -279,36 +554,50 @@ export default function Home() {
                 </div>
                 <Link href="/schedule" className="text-sm text-white/50 hover:text-red-500 transition-colors">전체보기 →</Link>
               </div>
-              <div className="space-y-3">
-                {schedule.map((s, i) => (
-                  <div
-                    key={i}
-                    className={`flex items-center gap-4 p-4 border ${s.result ? 'border-white/5' : 'border-red-900/40'}`}
-                    style={{ backgroundColor: s.result ? '#080808' : '#0a0a0a' }}
-                  >
-                    <div className={`text-center w-14 flex-shrink-0 ${s.result ? 'opacity-40' : ''}`}>
-                      <div className="text-lg font-black text-white">{s.date}</div>
-                      <div className="text-xs text-white/50">{s.day}요일</div>
-                    </div>
-                    <div className="flex-1 flex items-center gap-3">
-                      <span className={`font-bold text-sm ${s.result ? 'text-white/40' : 'text-white'}`}>{s.home}</span>
-                      {s.result ? (
-                        <span className="text-white/70 font-black text-sm px-3 py-1" style={{ backgroundColor: '#0e0e0e' }}>{s.result}</span>
-                      ) : (
-                        <span className="font-bold text-xs px-3 py-1" style={{ backgroundColor: 'rgba(204,0,0,0.2)', color: '#CC0000' }}>VS</span>
-                      )}
-                      <span className={`font-bold text-sm ${s.result ? 'text-white/40' : 'text-white'}`}>{s.away}</span>
-                    </div>
-                    <div className="text-right text-xs text-white/40 flex-shrink-0">
-                      <div>{s.grade}</div>
-                      <div>{s.venue}</div>
-                    </div>
-                    {!s.result && (
-                      <span className="text-white text-[10px] font-bold px-2 py-1 flex-shrink-0" style={{ backgroundColor: '#CC0000' }}>예정</span>
-                    )}
-                  </div>
-                ))}
-              </div>
+              {matches.length === 0 ? (
+                <div className="py-10 text-center text-white/20 border border-white/5 text-sm" style={{ backgroundColor: '#0a0a0a' }}>
+                  등록된 경기 일정이 없습니다
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {matches.slice(0, 5).map((s) => {
+                    const hasResult = !!s.result;
+                    const scoreText = hasResult && s.homeScore !== null && s.awayScore !== null
+                      ? `${s.homeScore} : ${s.awayScore}` : null;
+                    return (
+                      <div
+                        key={s.id}
+                        className={`flex items-center gap-4 p-4 border ${hasResult ? 'border-white/5' : 'border-red-900/40'}`}
+                        style={{ backgroundColor: hasResult ? '#080808' : '#0a0a0a' }}
+                      >
+                        <div className={`text-center w-14 flex-shrink-0 ${hasResult ? 'opacity-40' : ''}`}>
+                          <div className="text-lg font-black text-white">{s.date?.slice(5).replace('-', '.')}</div>
+                          <div className="text-xs text-white/50">{s.day}요일</div>
+                        </div>
+                        <div className="flex-1 flex items-center gap-2 min-w-0">
+                          <span className={`font-bold text-sm truncate ${hasResult ? 'text-white/40' : 'text-white'}`}>{s.home}</span>
+                          {scoreText ? (
+                            <span className="font-black text-sm px-2 py-1 whitespace-nowrap flex-shrink-0" style={{ backgroundColor: '#0e0e0e', color: 'rgba(255,255,255,0.7)' }}>{scoreText}</span>
+                          ) : (
+                            <span className="font-bold text-xs px-2 py-1 flex-shrink-0" style={{ backgroundColor: 'rgba(204,0,0,0.2)', color: '#CC0000' }}>VS</span>
+                          )}
+                          <span className={`font-bold text-sm truncate ${hasResult ? 'text-white/40' : 'text-white'}`}>{s.away}</span>
+                        </div>
+                        <div className="text-right text-xs text-white/40 flex-shrink-0">
+                          <div>{s.grade}</div>
+                          <div>{s.venue}</div>
+                        </div>
+                        {!hasResult && (
+                          <span className="text-white text-[10px] font-bold px-2 py-1 flex-shrink-0" style={{ backgroundColor: '#CC0000' }}>예정</span>
+                        )}
+                        {hasResult && (
+                          <span className="text-white text-[10px] font-bold px-2 py-1 flex-shrink-0" style={{ backgroundColor: s.result === '승' ? '#16a34a' : s.result === '패' ? '#dc2626' : '#6b7280' }}>{s.result}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -321,29 +610,40 @@ export default function Home() {
                 <h2 className="text-2xl font-black text-white">다음 경기</h2>
                 <div className="section-divider mt-2" />
               </div>
-              <div className="border p-6" style={{ backgroundColor: '#0a0a0a', borderColor: 'rgba(204,0,0,0.3)' }}>
-                <div className="text-xs font-bold tracking-wider mb-4" style={{ color: '#CC0000' }}>2025 춘계 리그 · 3학년</div>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="text-center">
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-lg mb-2 mx-auto" style={{ backgroundColor: '#CC0000' }}>T</div>
-                    <div className="text-white font-bold text-sm">TAES FC</div>
-                    <div className="text-white/40 text-xs">홈</div>
+              {nextMatch ? (
+                <div className="border p-6" style={{ backgroundColor: '#0a0a0a', borderColor: 'rgba(204,0,0,0.3)' }}>
+                  <div className="text-xs font-bold tracking-wider mb-4" style={{ color: '#CC0000' }}>{nextMatch.grade}</div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="text-center">
+                      <div className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-lg mb-2 mx-auto" style={{ backgroundColor: '#CC0000' }}>
+                        {nextMatch.home.charAt(0)}
+                      </div>
+                      <div className="text-white font-bold text-sm">{nextMatch.home}</div>
+                      <div className="text-white/40 text-xs">홈</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-white/30 text-xs mb-1">{nextMatch.date}</div>
+                      <div className="text-white font-black text-2xl">VS</div>
+                      <div className="text-white/30 text-xs mt-1">{nextMatch.time}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-14 h-14 border border-white/10 rounded-full flex items-center justify-center text-white font-black text-lg mb-2 mx-auto" style={{ backgroundColor: '#0e0e0e' }}>
+                        {nextMatch.away.charAt(0)}
+                      </div>
+                      <div className="text-white font-bold text-sm">{nextMatch.away}</div>
+                      <div className="text-white/40 text-xs">원정</div>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-white/30 text-xs mb-1">04월 12일 (토)</div>
-                    <div className="text-white font-black text-2xl">VS</div>
-                    <div className="text-white/30 text-xs mt-1">10:00 AM</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-14 h-14 border border-white/10 rounded-full flex items-center justify-center text-white font-black text-lg mb-2 mx-auto" style={{ backgroundColor: '#0e0e0e' }}>D</div>
-                    <div className="text-white font-bold text-sm">드래곤 FC</div>
-                    <div className="text-white/40 text-xs">원정</div>
+                  <div className="text-white/50 text-xs py-2 px-3 text-center" style={{ backgroundColor: '#050505' }}>
+                    📍 {nextMatch.venue}
                   </div>
                 </div>
-                <div className="text-white/50 text-xs py-2 px-3 text-center" style={{ backgroundColor: '#050505' }}>
-                  📍 ○○구장 제1경기장
+              ) : (
+                <div className="border p-8 text-center" style={{ backgroundColor: '#0a0a0a', borderColor: 'rgba(255,255,255,0.05)' }}>
+                  <div className="text-4xl mb-3 opacity-20">⚽</div>
+                  <div className="text-white/30 text-sm font-bold">예정된 경기가 없습니다</div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Gallery preview */}
@@ -356,16 +656,24 @@ export default function Home() {
                 <Link href="/gallery" className="text-sm text-white/50 hover:text-red-500 transition-colors">더보기 →</Link>
               </div>
               <div className="grid grid-cols-3 gap-1.5">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Link
-                    key={i}
-                    href="/gallery"
-                    className="aspect-square border border-white/10 hover:border-red-800/50 transition-colors flex items-center justify-center text-white/10 text-3xl hover:text-white/20 group"
-                    style={{ backgroundColor: '#0e0e0e' }}
-                  >
-                    <span className="group-hover:scale-110 transition-transform">⚽</span>
-                  </Link>
-                ))}
+                {galleryPhotos.length > 0
+                  ? galleryPhotos.map((url, i) => (
+                    <Link key={i} href="/gallery"
+                      className="aspect-square overflow-hidden group relative block"
+                      style={{ backgroundColor: '#0e0e0e' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"/>
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(204,0,0,0.25)' }}/>
+                    </Link>
+                  ))
+                  : Array.from({ length: 6 }).map((_, i) => (
+                    <Link key={i} href="/gallery"
+                      className="aspect-square border border-white/10 flex items-center justify-center text-white/10 text-3xl"
+                      style={{ backgroundColor: '#0e0e0e' }}>
+                      <span>⚽</span>
+                    </Link>
+                  ))
+                }
               </div>
             </div>
           </div>

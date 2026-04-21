@@ -3,15 +3,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import {
   collection, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, orderBy, query
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const USER_AUTH_KEY = 'taes-user-login';
 
-// ── 이미지 압축 ──
-function compressImage(file: File, maxDim = 1200, quality = 0.75): Promise<string> {
+// ── 이미지 압축 → dataUrl (미리보기용) ──
+function compressImage(file: File, maxDim = 1600, quality = 0.85): Promise<string> {
   return new Promise(resolve => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -29,6 +30,24 @@ function compressImage(file: File, maxDim = 1200, quality = 0.75): Promise<strin
     };
     img.src = url;
   });
+}
+
+// ── dataUrl → Blob (fetch 없이 순수 JS 변환) ──
+function dataUrlToBlob(dataUrl: string): Blob {
+  const arr = dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)![1];
+  const bstr = atob(arr[1]);
+  const u8arr = new Uint8Array(bstr.length);
+  for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
+  return new Blob([u8arr], { type: mime });
+}
+
+// ── Firebase Storage 업로드 → 다운로드 URL 반환 ──
+async function uploadToStorage(albumId: string, itemId: string, dataUrl: string): Promise<string> {
+  const blob = dataUrlToBlob(dataUrl);
+  const storageRef = ref(storage, `albums/${albumId}/${itemId}.jpg`);
+  await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
+  return getDownloadURL(storageRef);
 }
 
 type MediaItem = { id: string; url: string; name: string; type: 'photo' };
@@ -52,6 +71,7 @@ export default function GalleryPage() {
   const [showUpload, setShowUpload] = useState(false);
   const [uploadAlbumId, setUploadAlbumId] = useState<string>('');
   const [uploadPreviews, setUploadPreviews] = useState<{ dataUrl: string; name: string }[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
 
   const [lightbox, setLightbox] = useState<{ albumId: string; itemIdx: number } | null>(null);
 
@@ -114,8 +134,17 @@ export default function GalleryPage() {
   }
 
   async function handleDeleteAlbum(id: string) {
-    if (!confirm('앨범을 삭제하면 사진·영상도 모두 삭제됩니다. 계속할까요?')) return;
+    if (!confirm('앨범을 삭제하면 사진도 모두 삭제됩니다. 계속할까요?')) return;
+    const album = albums.find(a => a.id === id);
     try {
+      // Storage 파일 삭제 (base64 항목은 무시)
+      if (album) {
+        for (const item of album.items) {
+          try {
+            await deleteObject(ref(storage, `albums/${id}/${item.id}.jpg`));
+          } catch { /* base64 항목이거나 이미 삭제됨 */ }
+        }
+      }
       await deleteDoc(doc(db, 'albums', id));
       setAlbums(prev => prev.filter(a => a.id !== id));
       if (openAlbum?.id === id) setOpenAlbum(null);
@@ -147,10 +176,15 @@ export default function GalleryPage() {
       if (!album) return;
 
       const newItems: MediaItem[] = [];
-      for (const preview of uploadPreviews) {
-        const itemId = String(Date.now() + Math.random());
-        // Store base64 dataURL directly in Firestore
-        newItems.push({ id: itemId, url: preview.dataUrl, name: preview.name, type: 'photo' });
+      const total = uploadPreviews.length;
+
+      for (let i = 0; i < total; i++) {
+        const preview = uploadPreviews[i];
+        setUploadProgress({ current: i + 1, total });
+        const itemId = String(Date.now() + i).replace('.', '');
+        // Firebase Storage에 업로드 → 다운로드 URL 저장
+        const downloadUrl = await uploadToStorage(uploadAlbumId, itemId, preview.dataUrl);
+        newItems.push({ id: itemId, url: downloadUrl, name: preview.name, type: 'photo' });
       }
 
       const updatedItems = [...album.items, ...newItems];
@@ -165,6 +199,7 @@ export default function GalleryPage() {
       alert('업로드에 실패했습니다.');
     } finally {
       setUploading(false);
+      setUploadProgress(null);
       setShowUpload(false);
       setUploadPreviews([]);
       setUploadAlbumId('');
@@ -175,6 +210,11 @@ export default function GalleryPage() {
     const album = albums.find(a => a.id === albumId);
     if (!album) return;
     try {
+      // Storage 파일 삭제 시도 (base64 항목은 무시)
+      try {
+        await deleteObject(ref(storage, `albums/${albumId}/${itemId}.jpg`));
+      } catch { /* base64 항목이거나 이미 삭제됨 */ }
+
       const updatedItems = album.items.filter(p => p.id !== itemId);
       await updateDoc(doc(db, 'albums', albumId), { items: updatedItems });
       setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, items: updatedItems } : a));
@@ -209,10 +249,14 @@ export default function GalleryPage() {
     try {
       const previews = await readFiles(files);
       const newItems: MediaItem[] = [];
-      for (const preview of previews) {
-        const itemId = String(Date.now() + Math.random());
-        // Store base64 dataURL directly in Firestore
-        newItems.push({ id: itemId, url: preview.dataUrl, name: preview.name, type: 'photo' });
+      const total = previews.length;
+
+      for (let i = 0; i < total; i++) {
+        const preview = previews[i];
+        setUploadProgress({ current: i + 1, total });
+        const itemId = String(Date.now() + i).replace('.', '');
+        const downloadUrl = await uploadToStorage(openAlbum.id, itemId, preview.dataUrl);
+        newItems.push({ id: itemId, url: downloadUrl, name: preview.name, type: 'photo' });
       }
 
       const updatedItems = [...openAlbum.items, ...newItems];
@@ -224,6 +268,7 @@ export default function GalleryPage() {
       alert('업로드에 실패했습니다.');
     } finally {
       setUploading(false);
+      setUploadProgress(null);
     }
   }
 
@@ -243,10 +288,18 @@ export default function GalleryPage() {
       <div className="max-w-6xl mx-auto px-4 py-10">
 
         {uploading && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
-            <div className="text-white text-center">
-              <div className="text-2xl mb-3 animate-spin">⏳</div>
-              <div className="font-bold">업로드 중...</div>
+          <div className="fixed inset-0 z-[70] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
+            <div className="text-white text-center px-8 py-6 rounded-xl" style={{ backgroundColor: '#111' }}>
+              <div className="text-3xl mb-3" style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>☁️</div>
+              <div className="font-bold text-lg mb-1">업로드 중...</div>
+              {uploadProgress && (
+                <>
+                  <div className="text-white/50 text-sm mb-3">{uploadProgress.current} / {uploadProgress.total} 장</div>
+                  <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#333' }}>
+                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%`, backgroundColor: '#CC0000' }} />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

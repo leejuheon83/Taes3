@@ -4,8 +4,190 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { db } from '@/lib/firebase';
 import {
-  collection, getDocs, doc, setDoc, deleteDoc, orderBy, query
+  collection, getDocs, getDoc, doc, setDoc, deleteDoc, orderBy, query
 } from 'firebase/firestore';
+
+// ── 이미지 로딩 헬퍼 ──
+function loadImg(src: string): Promise<HTMLImageElement> {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = src;
+  });
+}
+
+// ── 카드 → Canvas 생성 ──
+async function generateCardCanvas(player: Player): Promise<HTMLCanvasElement> {
+  const W = 400, H = 560, R = 14;
+  const cvs = document.createElement('canvas');
+  cvs.width = W; cvs.height = H;
+  const ctx = cvs.getContext('2d')!;
+
+  // 배경 그라디언트
+  const bg = ctx.createLinearGradient(W * 0.6, 0, 0, H);
+  bg.addColorStop(0, '#140000'); bg.addColorStop(0.5, '#060000'); bg.addColorStop(1, '#000');
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.roundRect(0, 0, W, H, R); ctx.fill();
+
+  // 카본 파이버
+  ctx.save(); ctx.globalAlpha = 0.028;
+  for (let x = 0; x < W; x += 4) for (let y = 0; y < H; y += 4) {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x, y, 2, 2); ctx.fillRect(x + 2, y + 2, 2, 2);
+  }
+  ctx.restore();
+
+  // 중앙 글로우
+  const glow = ctx.createRadialGradient(W/2, H*0.38, 0, W/2, H*0.38, W*0.6);
+  glow.addColorStop(0, 'rgba(187,0,0,0.18)'); glow.addColorStop(1, 'rgba(187,0,0,0)');
+  ctx.fillStyle = glow; ctx.beginPath();
+  ctx.ellipse(W/2, H*0.38, W*0.58, H*0.48, 0, 0, Math.PI*2); ctx.fill();
+
+  // TAES 로고 워터마크
+  try {
+    const logo = await loadImg('/taes-logo.png');
+    ctx.save(); ctx.globalAlpha = 0.18;
+    const lsz = W * 0.78;
+    ctx.drawImage(logo, (W - lsz)/2, H*0.5 - lsz*0.52, lsz, lsz);
+    ctx.restore();
+  } catch { /* ignore */ }
+
+  // 선수 사진
+  const photoSrc = player.photo || player.photoURL;
+  if (photoSrc) {
+    try {
+      const ph = await loadImg(photoSrc);
+      ctx.save();
+      const maxH = H * 0.62, maxW = W * 0.92;
+      let dw = ph.width, dh = ph.height;
+      if (dh > maxH) { dw = dw * maxH / dh; dh = maxH; }
+      if (dw > maxW) { dh = dh * maxW / dw; dw = maxW; }
+      ctx.drawImage(ph, (W - dw)/2, H * 0.79 - dh, dw, dh);
+      ctx.restore();
+    } catch { /* ignore */ }
+  } else {
+    ctx.save();
+    ctx.fillStyle = 'rgba(220,38,38,0.4)';
+    ctx.font = '900 80px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(`#${player.no}`, W/2, H * 0.53);
+    ctx.textAlign = 'left'; ctx.restore();
+  }
+
+  // 상단 광택
+  const shine = ctx.createLinearGradient(0, 0, W*0.7, H*0.55);
+  shine.addColorStop(0, 'rgba(255,255,255,0.10)'); shine.addColorStop(0.3, 'rgba(255,255,255,0.025)'); shine.addColorStop(0.52, 'rgba(255,255,255,0)');
+  ctx.fillStyle = shine; ctx.beginPath(); ctx.roundRect(0, 0, W, H, R); ctx.fill();
+
+  // 하단 패널 배경
+  const btm = ctx.createLinearGradient(0, H*0.72, 0, H);
+  btm.addColorStop(0, 'rgba(0,0,0,0)'); btm.addColorStop(0.3, 'rgba(0,0,0,0.88)'); btm.addColorStop(1, 'rgba(0,0,0,0.97)');
+  ctx.fillStyle = btm; ctx.beginPath(); ctx.roundRect(0, H*0.55, W, H*0.45, [0,0,R,R]); ctx.fill();
+
+  // 하단 글로우
+  const btmGlow = ctx.createRadialGradient(W/2, H, 0, W/2, H, W*0.75);
+  btmGlow.addColorStop(0, 'rgba(187,0,0,0.28)'); btmGlow.addColorStop(1, 'rgba(187,0,0,0)');
+  ctx.fillStyle = btmGlow; ctx.beginPath(); ctx.roundRect(0, H*0.6, W, H*0.4, [0,0,R,R]); ctx.fill();
+
+  // 메탈릭 테두리
+  const bdr = ctx.createLinearGradient(0, 0, W, H);
+  bdr.addColorStop(0,'#ff4444'); bdr.addColorStop(0.18,'rgba(255,255,255,0.55)');
+  bdr.addColorStop(0.38,'#dc2626'); bdr.addColorStop(0.62,'#7a0000');
+  bdr.addColorStop(0.85,'rgba(255,68,68,0.27)'); bdr.addColorStop(1,'#7a0000');
+  ctx.strokeStyle = bdr; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(1.5, 1.5, W-3, H-3, R-1); ctx.stroke();
+
+  // 상단 라인
+  const topL = ctx.createLinearGradient(0, 0, W, 0);
+  topL.addColorStop(0,'transparent'); topL.addColorStop(0.12,'#7a0000');
+  topL.addColorStop(0.32,'#dc2626'); topL.addColorStop(0.5,'rgba(255,180,180,0.9)');
+  topL.addColorStop(0.68,'#dc2626'); topL.addColorStop(0.88,'#7a0000'); topL.addColorStop(1,'transparent');
+  ctx.fillStyle = topL; ctx.fillRect(0, 0, W, 2);
+
+  // OVR
+  const ovr = Math.round((player.stats.spd+player.stats.sht+player.stats.pas+player.stats.dri+player.stats.def+player.stats.phy)/6);
+  ctx.save(); ctx.shadowColor='#bb0000'; ctx.shadowBlur=24;
+  ctx.fillStyle='#fff'; ctx.font='900 56px system-ui,sans-serif';
+  ctx.fillText(String(ovr), 18, 70); ctx.restore();
+
+  // 포지션
+  const pos = (player.positions?.length ? player.positions : [player.pos]).join('·');
+  ctx.save(); ctx.shadowColor='#bb0000'; ctx.shadowBlur=14;
+  ctx.fillStyle='#ff5252'; ctx.font='900 18px system-ui,sans-serif';
+  ctx.fillText(pos, 18, 96); ctx.restore();
+
+  // 명예회원 배지
+  if (player.honorary) {
+    ctx.save();
+    ctx.fillStyle='rgba(251,191,36,0.12)'; ctx.strokeStyle='rgba(251,191,36,0.4)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.roundRect(18, 104, 82, 18, 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#fbbf24'; ctx.font='900 11px system-ui,sans-serif';
+    ctx.fillText('★ 명예회원', 22, 117); ctx.restore();
+  }
+
+  // TAES FC
+  ctx.save(); ctx.textAlign='right';
+  ctx.fillStyle='#ff5252'; ctx.font='900 19px system-ui,sans-serif'; ctx.fillText('TAES', W-16, 30);
+  ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.font='700 13px system-ui,sans-serif'; ctx.fillText('FC', W-16, 48);
+  ctx.textAlign='left'; ctx.restore();
+
+  // 구분선
+  const sepY = H * 0.795;
+  const sep = ctx.createLinearGradient(0, 0, W, 0);
+  sep.addColorStop(0,'transparent'); sep.addColorStop(0.1,'#7a0000');
+  sep.addColorStop(0.32,'#ff5252'); sep.addColorStop(0.5,'rgba(255,200,200,0.75)');
+  sep.addColorStop(0.68,'#ff5252'); sep.addColorStop(0.9,'#7a0000'); sep.addColorStop(1,'transparent');
+  ctx.strokeStyle=sep; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,sepY); ctx.lineTo(W,sepY); ctx.stroke();
+
+  // 이름
+  ctx.save(); ctx.textAlign='center'; ctx.shadowColor='rgba(187,0,0,0.5)'; ctx.shadowBlur=18;
+  ctx.fillStyle='#fff'; ctx.font='900 26px system-ui,sans-serif';
+  ctx.fillText(player.name, W/2, H*0.845); ctx.restore();
+
+  // No. 배지
+  ctx.save();
+  ctx.fillStyle='rgba(187,0,0,0.12)'; ctx.strokeStyle='rgba(220,38,38,0.38)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect((W-72)/2, H*0.858, 72, 22, 11); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.38)'; ctx.font='700 13px system-ui,sans-serif'; ctx.textAlign='center';
+  ctx.fillText(`No.${player.no}`, W/2, H*0.858+15); ctx.restore();
+
+  // 스탯 그리드
+  const statsArr = [
+    {k:'PAC',v:player.stats.spd},{k:'SHO',v:player.stats.sht},{k:'PAS',v:player.stats.pas},
+    {k:'DRI',v:player.stats.dri},{k:'DEF',v:player.stats.def},{k:'PHY',v:player.stats.phy},
+  ];
+  const sy = H * 0.9, cw = W / 3;
+  statsArr.forEach(({k,v},i) => {
+    const cx = (i%3)*cw + cw/2, cy = sy + Math.floor(i/3)*38;
+    ctx.save(); ctx.textAlign='center';
+    ctx.fillStyle = v>=80?'#4ade80':v>=65?'#facc15':'#f87171';
+    ctx.font='900 22px system-ui,sans-serif'; ctx.fillText(String(v), cx, cy);
+    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='700 12px system-ui,sans-serif';
+    ctx.fillText(k, cx, cy+16); ctx.restore();
+  });
+
+  return cvs;
+}
+
+async function sharePlayerCard(player: Player) {
+  try {
+    const canvas = await generateCardCanvas(player);
+    const blob = await new Promise<Blob>((res, rej) =>
+      canvas.toBlob(b => b ? res(b) : rej(new Error('blob fail')), 'image/png')
+    );
+    const file = new File([blob], `${player.name}_TAESFC.png`, { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ title: `${player.name} - TAES FC`, files: [file] });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${player.name}_TAESFC.png`; a.click();
+      URL.revokeObjectURL(url);
+    }
+  } catch { /* user cancelled or error */ }
+}
 
 // ── 이미지 압축 (canvas 리사이즈 후 JPEG 변환) ──
 function compressImage(file: File, maxDim = 600, quality = 0.8): Promise<string> {
@@ -42,209 +224,262 @@ type Player = {
   pos: string;
   positions: PosKey[];
   grade: '3학년';
+  honorary: boolean;
   stats: { spd: number; sht: number; pas: number; dri: number; def: number; phy: number };
-  photo?: string;       // preview (local dataURL or storage URL)
-  modelPhoto?: string;  // preview (local dataURL or storage URL)
-  photoURL?: string | null;       // Firebase Storage URL
-  modelPhotoURL?: string | null;  // Firebase Storage URL
+  photo?: string;
+  modelPhoto?: string;
+  photoURL?: string | null;
+  modelPhotoURL?: string | null;
 };
 
 const posColors: Record<string, string> = { GK: '#7C3AED', DF: '#059669', MF: '#2563EB', FW: '#DC2626' };
 
-const cardThemes: Record<string, { bg: string; accent: string; border: string; glow: string; stripe: string }> = {
-  GK: {
-    bg: 'linear-gradient(160deg,#0a0800 0%,#1a1000 40%,#050505 100%)',
-    accent: '#fbbf24', glow: '#f59e0b',
-    border: 'linear-gradient(135deg,#fbbf24 0%,#fef3c7 25%,#d97706 50%,#fde68a 75%,#92400e 100%)',
-    stripe: 'rgba(251,191,36,0.08)',
-  },
-  DF: {
-    bg: 'linear-gradient(160deg,#00060f 0%,#000d1a 40%,#050505 100%)',
-    accent: '#60a5fa', glow: '#3b82f6',
-    border: 'linear-gradient(135deg,#60a5fa 0%,#eff6ff 25%,#2563eb 50%,#bfdbfe 75%,#1e40af 100%)',
-    stripe: 'rgba(96,165,250,0.08)',
-  },
-  MF: {
-    bg: 'linear-gradient(160deg,#00080a 0%,#001014 40%,#050505 100%)',
-    accent: '#4ade80', glow: '#22c55e',
-    border: 'linear-gradient(135deg,#4ade80 0%,#f0fdf4 25%,#16a34a 50%,#bbf7d0 75%,#15803d 100%)',
-    stripe: 'rgba(74,222,128,0.08)',
-  },
-  FW: {
-    bg: 'linear-gradient(160deg,#0a0000 0%,#1a0000 40%,#050505 100%)',
-    accent: '#f87171', glow: '#ef4444',
-    border: 'linear-gradient(135deg,#f87171 0%,#fef2f2 25%,#dc2626 50%,#fca5a5 75%,#991b1b 100%)',
-    stripe: 'rgba(248,113,113,0.08)',
-  },
+// ── 카드 테마 ──
+const CARD_RED = {
+  base: '#060000', mid: '#140000',
+  accent: '#dc2626', bright: '#ff5252', glow: '#bb0000',
+  border: '#7a0000', borderHi: '#ff4444',
+  sepMid: 'rgba(255,200,200,0.75)',
+};
+const CARD_GOLD = {
+  base: '#060200', mid: '#150e00',
+  accent: '#c8900a', bright: '#fbbf24', glow: '#a07008',
+  border: '#7a5500', borderHi: '#ffe066',
+  sepMid: 'rgba(255,240,180,0.80)',
 };
 
-function StatBar({ value, label }: { value: number; label: string }) {
-  const color = value >= 78 ? '#22c55e' : value >= 62 ? '#eab308' : '#ef4444';
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-[10px] font-black text-white/40 w-7">{label}</span>
-      <div className="flex-1 h-1.5 rounded-full bg-white/10">
-        <div className="h-full rounded-full" style={{ width: `${value}%`, backgroundColor: color }} />
-      </div>
-      <span className="text-[11px] font-black w-5 text-right" style={{ color }}>{value}</span>
-    </div>
-  );
-}
-
 function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) {
-  const theme = cardThemes[player.pos] ?? cardThemes.FW;
+  const T = CARD_RED;
   const photoSrc = player.photo || player.photoURL || undefined;
   const modelSrc = player.modelPhoto || player.modelPhotoURL || undefined;
   const hasBack = !!modelSrc;
   const ovr = Math.round((player.stats.spd + player.stats.sht + player.stats.pas + player.stats.dri + player.stats.def + player.stats.phy) / 6);
   const stats = [
-    { k: 'PAC', v: player.stats.spd },
-    { k: 'SHO', v: player.stats.sht },
-    { k: 'PAS', v: player.stats.pas },
-    { k: 'DRI', v: player.stats.dri },
-    { k: 'DEF', v: player.stats.def },
-    { k: 'PHY', v: player.stats.phy },
+    { k: 'PAC', v: player.stats.spd }, { k: 'SHO', v: player.stats.sht },
+    { k: 'PAS', v: player.stats.pas }, { k: 'DRI', v: player.stats.dri },
+    { k: 'DEF', v: player.stats.def }, { k: 'PHY', v: player.stats.phy },
   ];
+  const uid = player.id;
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const holoRef = useRef<HTMLDivElement>(null);
+  const glareRef = useRef<HTMLDivElement>(null);
+  const [sharing, setSharing] = useState(false);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (hasBack || !wrapRef.current) return;
+    const rect = wrapRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    const rotY = (x - 0.5) * 22;
+    const rotX = (y - 0.5) * -18;
+    wrapRef.current.style.transition = 'transform 0.05s linear';
+    wrapRef.current.style.transform = `perspective(700px) rotateY(${rotY}deg) rotateX(${rotX}deg) scale(1.06)`;
+    // 홀로그래픽 포일
+    if (holoRef.current) {
+      const angle = Math.round(Math.atan2(y - 0.5, x - 0.5) * (180 / Math.PI));
+      holoRef.current.style.opacity = '1';
+      holoRef.current.style.backgroundImage = [
+        `linear-gradient(${angle}deg,`,
+        `rgba(255,50,80,0.13) 0%,`,
+        `rgba(255,160,0,0.11) 20%,`,
+        `rgba(80,255,120,0.09) 40%,`,
+        `rgba(50,160,255,0.11) 60%,`,
+        `rgba(180,60,255,0.09) 80%,`,
+        `rgba(255,50,120,0.07) 100%)`,
+      ].join('');
+    }
+    // 글레어 스팟
+    if (glareRef.current) {
+      glareRef.current.style.background = `radial-gradient(circle at ${x * 100}% ${y * 100}%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.05) 35%, transparent 65%)`;
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (!wrapRef.current) return;
+    wrapRef.current.style.transition = 'transform 0.5s cubic-bezier(0.23,1,0.32,1)';
+    wrapRef.current.style.transform = 'none';
+    if (holoRef.current) holoRef.current.style.opacity = '0';
+    if (glareRef.current) glareRef.current.style.background = 'none';
+  };
+
+  const handleClick = () => {
+    if (wrapRef.current) {
+      const el = wrapRef.current;
+      el.animate([
+        { transform: el.style.transform || 'none', filter: 'brightness(1)' },
+        { transform: (el.style.transform || 'none') + ' scale(1.08)', filter: 'brightness(1.5)' },
+        { transform: (el.style.transform || 'none') + ' scale(0.96)', filter: 'brightness(1)' },
+        { transform: el.style.transform || 'none', filter: 'brightness(1)' },
+      ], { duration: 380, easing: 'cubic-bezier(0.36,0.07,0.19,0.97)' });
+    }
+    onClick();
+  };
 
   return (
-    <div
-      className="relative cursor-pointer hover:z-10"
+    <div className="relative hover:z-10"
       style={{ minWidth: '150px', perspective: '900px' }}
-      onClick={onClick}
     >
-      <div
-        className="relative transition-all duration-500"
-        style={{ transformStyle: 'preserve-3d' }}
-        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = hasBack ? 'rotateY(180deg)' : 'scale(1.06)'; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'rotateY(0deg)'; }}
+      <div ref={wrapRef} className="relative cursor-pointer"
+        style={{ transformStyle: 'preserve-3d', transition: 'transform 0.5s cubic-bezier(0.23,1,0.32,1)' }}
+        onMouseEnter={e => { if (hasBack) (e.currentTarget as HTMLDivElement).style.transform = 'rotateY(180deg)'; }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => { handleMouseLeave(); if (hasBack && wrapRef.current) { wrapRef.current.style.transition = 'transform 0.5s'; wrapRef.current.style.transform = 'none'; } }}
+        onClick={handleClick}
       >
-        {/* ── 앞면 ── */}
-        <div
-          className="relative overflow-hidden"
+        {/* ══ 앞면 ══ */}
+        <div className="relative overflow-hidden"
           style={{
             aspectRatio: '3/4.2',
-            borderRadius: '12px',
-            background: theme.bg,
-            boxShadow: `0 8px 40px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.06), 0 0 30px ${theme.glow}30`,
+            borderRadius: '14px',
+            background: `linear-gradient(155deg, ${T.mid} 0%, ${T.base} 50%, #000 100%)`,
             backfaceVisibility: 'hidden',
+            boxShadow: `0 2px 0 ${T.border}, 0 16px 56px rgba(0,0,0,0.97), 0 0 28px ${T.glow}1a, inset 0 1px 0 rgba(255,255,255,0.05)`,
           }}
         >
-          {/* 메탈릭 테두리 */}
-          <div style={{
-            position: 'absolute', inset: 0, borderRadius: '12px', zIndex: 20,
-            background: theme.border, padding: '2px',
-            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-            WebkitMaskComposite: 'xor', maskComposite: 'exclude',
-            pointerEvents: 'none',
-          }} />
-
-          {/* 대각선 스트라이프 */}
-          <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
-            backgroundImage: `repeating-linear-gradient(45deg, ${theme.stripe} 0px, ${theme.stripe} 2px, transparent 2px, transparent 18px)`,
-          }} />
-
-          {/* 홀로그래픽 원형 + 방사선 SVG */}
+          {/* ── SVG: 카본 파이버 + 센터 글로우 ── */}
           <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-            <circle cx="50%" cy="35%" r="90" fill={`${theme.glow}22`} />
-            <circle cx="50%" cy="35%" r="60" fill={`${theme.glow}15`} />
-            {[45, 75, 105, 140, 175, 210].map(r => (
-              <circle key={r} cx="50%" cy="35%" r={r} fill="none" stroke={theme.accent} strokeWidth="0.6" opacity="0.2" />
-            ))}
-            {Array.from({length: 16}, (_, i) => i * 22.5).map(deg => {
-              const rad = (deg * Math.PI) / 180;
-              return <line key={deg} x1="50%" y1="35%"
-                x2={`calc(50% + ${220 * Math.cos(rad)}px)`}
-                y2={`calc(35% + ${220 * Math.sin(rad)}px)`}
-                stroke={theme.accent} strokeWidth="0.4" opacity="0.12" />;
-            })}
-            {[
-              { x: '15%', y: '12%', size: 6 }, { x: '82%', y: '8%', size: 8 },
-              { x: '88%', y: '22%', size: 5 }, { x: '10%', y: '28%', size: 4 },
-              { x: '90%', y: '55%', size: 5 }, { x: '8%', y: '60%', size: 4 },
-              { x: '20%', y: '72%', size: 3 }, { x: '78%', y: '70%', size: 4 },
-            ].map((s, i) => (
-              <g key={i}>
-                <text x={s.x} y={s.y} fontSize={s.size * 2} fill={theme.accent} opacity="0.6" textAnchor="middle">✦</text>
-              </g>
-            ))}
+            <defs>
+              <pattern id={`cf-${uid}`} x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+                <rect width="4" height="4" fill="transparent"/>
+                <rect x="0" y="0" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
+                <rect x="2" y="2" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
+                <rect x="0" y="0" width="2" height="0.7" fill="rgba(255,255,255,0.022)"/>
+                <rect x="2" y="2" width="2" height="0.7" fill="rgba(255,255,255,0.022)"/>
+              </pattern>
+              <radialGradient id={`cg-${uid}`} cx="50%" cy="38%" r="52%">
+                <stop offset="0%" stopColor={T.glow} stopOpacity="0.16"/>
+                <stop offset="100%" stopColor={T.glow} stopOpacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="100%" height="100%" fill={`url(#cf-${uid})`}/>
+            <ellipse cx="50%" cy="38%" rx="58%" ry="48%" fill={`url(#cg-${uid})`}/>
           </svg>
 
-          {/* 하단 바닥 글로우 */}
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%', pointerEvents: 'none',
-            background: `radial-gradient(ellipse 80% 40% at 50% 100%, ${theme.glow}35, transparent 70%)`,
-          }} />
+          {/* ── 로고 워터마크 ── */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/taes-logo.png" alt="" aria-hidden style={{
+            position: 'absolute', top: '50%', left: '50%',
+            transform: 'translate(-50%, -52%)',
+            width: '78%', pointerEvents: 'none',
+            opacity: 0.22, filter: 'grayscale(1) brightness(2)',
+            zIndex: 2,
+          }}/>
 
-          {/* 광택 쉰 */}
+          {/* ── 경사 광택 레이어 ── */}
           <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: '12px',
-            background: 'linear-gradient(130deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 25%, transparent 55%)',
-          }} />
+            position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: '14px',
+            background: 'linear-gradient(128deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.025) 28%, transparent 52%)',
+          }}/>
+
+          {/* ── 홀로그래픽 포일 (마우스 따라 움직임) ── */}
+          <div ref={holoRef} style={{
+            position: 'absolute', inset: 0, borderRadius: '14px', pointerEvents: 'none', zIndex: 18,
+            opacity: 0, transition: 'opacity 0.3s',
+            mixBlendMode: 'screen',
+          }}/>
+          {/* ── 글레어 스팟 ── */}
+          <div ref={glareRef} style={{
+            position: 'absolute', inset: 0, borderRadius: '14px', pointerEvents: 'none', zIndex: 19,
+          }}/>
+
+          {/* ── 메탈릭 테두리 (1.5px 단선) ── */}
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: '14px', zIndex: 22, pointerEvents: 'none',
+            background: `linear-gradient(145deg, ${T.borderHi} 0%, rgba(255,255,255,0.55) 18%, ${T.accent} 38%, ${T.border} 62%, ${T.borderHi}44 85%, ${T.border} 100%)`,
+            padding: '1.5px',
+            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+            WebkitMaskComposite: 'xor', maskComposite: 'exclude',
+          }}/>
+
+          {/* ── 상단 액센트 라인 ── */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: 2, zIndex: 25, pointerEvents: 'none',
+            background: `linear-gradient(90deg, transparent, ${T.border} 12%, ${T.accent} 32%, rgba(255,180,180,0.9) 50%, ${T.accent} 68%, ${T.border} 88%, transparent)`,
+            borderRadius: '14px 14px 0 0',
+          }}/>
+
+          {/* ── 하단 글로우 ── */}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '45%', pointerEvents: 'none',
+            background: `radial-gradient(ellipse 75% 38% at 50% 100%, ${T.glow}30, transparent 70%)`,
+          }}/>
+
+          {/* ── OVR + 포지션 ── */}
+          <div style={{ position: 'absolute', top: 10, left: 11, zIndex: 15 }}>
+            <div style={{
+              fontSize: 28, fontWeight: 900, color: '#fff', lineHeight: 1,
+              textShadow: `0 0 14px ${T.glow}, 0 2px 8px rgba(0,0,0,0.9)`,
+            }}>{ovr}</div>
+            <div style={{
+              fontSize: 10, fontWeight: 900, color: T.bright, letterSpacing: '0.07em', marginTop: 2,
+              textShadow: `0 0 8px ${T.glow}`,
+            }}>{(player.positions ?? [player.pos]).join('·')}</div>
+            {player.honorary && (
+              <div style={{
+                marginTop: 5, fontSize: 6.5, fontWeight: 900, letterSpacing: '0.07em',
+                color: '#fbbf24', border: '1px solid #fbbf2466',
+                padding: '1.5px 4px', borderRadius: 2,
+                textShadow: '0 0 6px #d4a01780',
+              }}>★ 명예회원</div>
+            )}
+          </div>
+
+          {/* ── TAES FC ── */}
+          <div style={{ position: 'absolute', top: 10, right: 10, textAlign: 'right', zIndex: 15 }}>
+            <div style={{ fontSize: 10, fontWeight: 900, color: T.bright, letterSpacing: '0.12em', opacity: 0.85 }}>TAES</div>
+            <div style={{ fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.1em', marginTop: 1 }}>FC</div>
+          </div>
 
           {/* ── 선수 사진 ── */}
           <div style={{
             position: 'absolute', bottom: '21%', left: '50%',
             transform: 'translateX(-50%)',
-            width: '92%', height: '64%',
+            width: '92%', height: '62%',
             display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-            zIndex: 5,
+            zIndex: 10,
           }}>
             {photoSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={photoSrc} alt={player.name} style={{
                 maxHeight: '100%', maxWidth: '100%', objectFit: 'contain',
-              }} />
+                filter: `drop-shadow(0 4px 18px rgba(0,0,0,0.95)) drop-shadow(0 0 10px ${T.glow}30)`,
+              }}/>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                <div style={{ fontSize: 38, fontWeight: 900, color: theme.accent, opacity: 0.5,
-                  textShadow: `0 0 30px ${theme.glow}` }}>#{player.no}</div>
-                <div style={{ fontSize: 22, opacity: 0.2, marginTop: 4 }}>⚽</div>
+                <div style={{ fontSize: 36, fontWeight: 900, color: T.accent, opacity: 0.4,
+                  textShadow: `0 0 24px ${T.glow}` }}>#{player.no}</div>
+                <div style={{ fontSize: 20, opacity: 0.15, marginTop: 4 }}>⚽</div>
               </div>
             )}
           </div>
 
-          {/* ── 상단 좌측: OVR + 포지션 ── */}
-          <div style={{ position: 'absolute', top: 10, left: 11, textAlign: 'center', zIndex: 10 }}>
-            <div style={{
-              fontSize: 28, fontWeight: 900, color: '#fff', lineHeight: 1,
-              textShadow: `0 0 16px ${theme.glow}, 0 2px 8px rgba(0,0,0,0.9)`,
-            }}>{ovr}</div>
-            <div style={{ fontSize: 11, fontWeight: 900, color: theme.accent, letterSpacing: '0.08em', marginTop: 2 }}>{(player.positions ?? [player.pos]).join('·')}</div>
-          </div>
-
-          {/* ── 상단 우측: TAES ── */}
-          <div style={{ position: 'absolute', top: 10, right: 10, textAlign: 'right', zIndex: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 900, color: theme.accent, letterSpacing: '0.12em', opacity: 0.8 }}>TAES</div>
-            <div style={{ fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.1em', marginTop: 1 }}>FC</div>
-          </div>
-
-          {/* ── 하단 정보 ── */}
+          {/* ── 하단 정보 패널 ── */}
           <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10,
-            background: `linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.85) 50%, transparent 100%)`,
-            padding: '32px 10px 10px',
-            borderRadius: '0 0 12px 12px',
+            position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 15,
+            background: `linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.85) 55%, transparent 100%)`,
+            padding: '28px 10px 10px',
+            borderRadius: '0 0 14px 14px',
           }}>
-            <div style={{ height: '1px', background: `linear-gradient(to right, transparent, ${theme.accent}90, transparent)`, marginBottom: 7 }} />
-            <div style={{ textAlign: 'center', marginBottom: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 900, color: '#fff',
-                letterSpacing: '0.05em',
-                textShadow: `0 0 12px ${theme.glow}60, 0 1px 4px rgba(0,0,0,0.9)` }}>
-                {player.name}
-              </div>
+            <div style={{
+              height: 1, marginBottom: 7,
+              background: `linear-gradient(to right, transparent, ${T.border} 10%, ${T.bright} 32%, ${T.sepMid} 50%, ${T.bright} 68%, ${T.border} 90%, transparent)`,
+              boxShadow: `0 0 5px ${T.glow}45`,
+            }}/>
+            <div style={{ textAlign: 'center', marginBottom: 7 }}>
               <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: '2px',
-                marginTop: 3, padding: '2px 8px', borderRadius: '20px',
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.2)',
+                fontSize: 13, fontWeight: 900, color: '#fff', letterSpacing: '0.05em',
+                textShadow: `0 0 12px ${T.glow}55, 0 1px 4px rgba(0,0,0,0.9)`,
+              }}>{player.name}</div>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 2,
+                marginTop: 3, padding: '2px 8px', borderRadius: 20,
+                background: `${T.glow}12`, border: `1px solid ${T.accent}38`,
               }}>
-                <span style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.06em' }}>No.</span>
-                <span style={{ fontSize: 12, fontWeight: 900, color: '#fff',
-                  textShadow: `0 0 10px ${theme.glow}, 0 1px 3px rgba(0,0,0,0.8)` }}>{player.no}</span>
+                <span style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.38)', letterSpacing: '0.06em' }}>No.</span>
+                <span style={{ fontSize: 12, fontWeight: 900, color: '#fff', textShadow: `0 0 8px ${T.glow}` }}>{player.no}</span>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '4px 2px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '3px 2px' }}>
               {stats.map(({ k, v }) => (
                 <div key={k} style={{ textAlign: 'center' }}>
                   <div style={{
@@ -252,43 +487,85 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
                     color: v >= 80 ? '#4ade80' : v >= 65 ? '#facc15' : '#f87171',
                     textShadow: '0 1px 4px rgba(0,0,0,0.9)',
                   }}>{v}</div>
-                  <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.06em', marginTop: 1 }}>{k}</div>
+                  <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.06em', marginTop: 1 }}>{k}</div>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* ── 뒷면 ── */}
+        {/* ══ 뒷면 (로고) ══ */}
         {hasBack && (
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden"
+          <div className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden"
             style={{
-              borderRadius: '12px',
-              background: theme.bg,
+              borderRadius: '14px',
+              background: `linear-gradient(155deg, ${T.mid} 0%, ${T.base} 50%, #000 100%)`,
               backfaceVisibility: 'hidden',
               transform: 'rotateY(180deg)',
-              boxShadow: `0 8px 32px rgba(0,0,0,0.8)`,
+              boxShadow: `0 2px 0 ${T.border}, 0 16px 56px rgba(0,0,0,0.97)`,
             }}
           >
+            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+              <rect width="100%" height="100%" fill={`url(#cf-${uid})`}/>
+            </svg>
             <div style={{
-              position: 'absolute', inset: 0, borderRadius: '12px',
-              background: theme.border,
-              padding: '2px',
+              position: 'absolute', inset: 0, borderRadius: '14px', pointerEvents: 'none',
+              background: `linear-gradient(145deg, ${T.borderHi} 0%, rgba(255,255,255,0.55) 18%, ${T.accent} 38%, ${T.border} 62%, ${T.borderHi}44 85%, ${T.border} 100%)`,
+              padding: '1.5px',
               WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-              WebkitMaskComposite: 'xor',
-              maskComposite: 'exclude',
-            }} />
-            <div className="text-[9px] font-black tracking-widest mb-2 z-10" style={{ color: theme.accent }}>TAES FC PREMIER</div>
+              WebkitMaskComposite: 'xor', maskComposite: 'exclude',
+            }}/>
+            <div style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: '14px',
+              background: 'linear-gradient(128deg, rgba(255,255,255,0.08) 0%, transparent 40%)',
+            }}/>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={modelSrc} alt="3D" className="z-10" style={{ width: '80%', objectFit: 'contain' }} />
+            <img src="/taes-logo.png" alt="" aria-hidden style={{
+              position: 'absolute', top: '50%', left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '70%', pointerEvents: 'none',
+              opacity: 0.22, filter: 'grayscale(1) brightness(2)',
+              zIndex: 2,
+            }}/>
+            <div className="text-[9px] font-black tracking-widest mb-2 z-10" style={{ color: T.bright }}>TAES FC PREMIER</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={modelSrc} alt="logo" className="z-10" style={{ width: '80%', objectFit: 'contain', filter: `drop-shadow(0 0 14px ${T.glow}50)` }}/>
             <div className="mt-2 text-center z-10">
               <div className="text-white font-black text-sm">{player.name}</div>
-              <div className="text-[11px] font-bold mt-0.5" style={{ color: theme.accent }}>No.{player.no} · {(player.positions ?? [player.pos]).join('·')}</div>
+              <div className="text-[11px] font-bold mt-0.5" style={{ color: T.accent }}>No.{player.no} · {(player.positions ?? [player.pos]).join('·')}</div>
             </div>
           </div>
         )}
       </div>
+
+      {/* ── 공유 버튼 ── */}
+      <button
+        onClick={async e => {
+          e.stopPropagation();
+          setSharing(true);
+          await sharePlayerCard(player);
+          setSharing(false);
+        }}
+        disabled={sharing}
+        style={{
+          marginTop: 8, width: '100%', padding: '7px 0',
+          background: sharing ? 'rgba(255,255,255,0.05)' : 'rgba(220,38,38,0.15)',
+          border: '1px solid rgba(220,38,38,0.3)',
+          borderRadius: 8, color: sharing ? 'rgba(255,255,255,0.3)' : '#ff5252',
+          fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
+          cursor: sharing ? 'not-allowed' : 'pointer',
+          transition: 'all 0.2s',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+        }}
+        onMouseEnter={e => { if (!sharing) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(220,38,38,0.28)'; }}
+        onMouseLeave={e => { if (!sharing) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(220,38,38,0.15)'; }}
+      >
+        {sharing ? (
+          <><span style={{ display:'inline-block', animation:'spin 0.8s linear infinite' }}>⟳</span> 생성 중...</>
+        ) : (
+          <><span>📤</span> 카드 공유</>
+        )}
+      </button>
     </div>
   );
 }
@@ -299,9 +576,12 @@ const emptyForm = {
   no: '', name: '',
   positions: ['FW'] as PosKey[],
   grade: '3학년' as Player['grade'],
+  honorary: false,
   spd: '', sht: '', pas: '', dri: '', def: '', phy: '',
-  photo: '',       // local dataURL (preview)
-  modelPhoto: '',  // local dataURL (preview)
+  photo: '',
+  modelPhoto: '',
+  photoCleared: false,
+  modelPhotoCleared: false,
 };
 type FormState = typeof emptyForm;
 
@@ -310,10 +590,13 @@ function playerToForm(p: Player): FormState {
     no: String(p.no), name: p.name,
     positions: (p.positions?.length ? p.positions : [p.pos as PosKey]),
     grade: p.grade,
-    spd: String(p.stats.spd), sht: String(p.stats.sht), pas: String(p.stats.pas),
-    dri: String(p.stats.dri), def: String(p.stats.def), phy: String(p.stats.phy),
+    honorary: p.honorary ?? false,
+    spd: String(p.stats?.spd ?? 0), sht: String(p.stats?.sht ?? 0), pas: String(p.stats?.pas ?? 0),
+    dri: String(p.stats?.dri ?? 0), def: String(p.stats?.def ?? 0), phy: String(p.stats?.phy ?? 0),
     photo: p.photo || p.photoURL || '',
     modelPhoto: p.modelPhoto || p.modelPhotoURL || '',
+    photoCleared: false,
+    modelPhotoCleared: false,
   };
 }
 
@@ -358,6 +641,7 @@ function PlayersContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [activeGrade, setActiveGrade] = useState<'전체' | '3학년'>('전체');
   const [search, setSearch] = useState('');
   const [activePos, setActivePos] = useState('전체');
@@ -383,7 +667,8 @@ function PlayersContent() {
             pos: data.pos,
             positions: data.positions ?? [data.pos],
             grade: data.grade,
-            stats: data.stats,
+            honorary: data.honorary ?? false,
+            stats: data.stats ?? { spd: 0, sht: 0, pas: 0, dri: 0, def: 0, phy: 0 },
             photoURL: data.photoURL ?? null,
             modelPhotoURL: data.modelPhotoURL ?? null,
             photo: data.photoURL ?? undefined,
@@ -434,13 +719,19 @@ function PlayersContent() {
       let photoURL: string | null = null;
       let modelPhotoURL: string | null = null;
 
-      if (form.photo) {
+      // Handle photo: if user cleared it, set to null. Otherwise use new value or keep old one.
+      if (form.photoCleared) {
+        photoURL = null;
+      } else if (form.photo) {
         photoURL = form.photo; // base64 dataURL or existing value
       } else if (editMode && selected) {
         photoURL = selected.photoURL ?? null;
       }
 
-      if (form.modelPhoto) {
+      // Handle model photo: if user cleared it, set to null. Otherwise use new value or keep old one.
+      if (form.modelPhotoCleared) {
+        modelPhotoURL = null;
+      } else if (form.modelPhoto) {
         modelPhotoURL = form.modelPhoto; // base64 dataURL or existing value
       } else if (editMode && selected) {
         modelPhotoURL = selected.modelPhotoURL ?? null;
@@ -452,6 +743,7 @@ function PlayersContent() {
         pos: positions[0],
         positions,
         grade: form.grade,
+        honorary: form.honorary,
         stats: {
           spd: Number(form.spd), sht: Number(form.sht), pas: Number(form.pas),
           dri: Number(form.dri), def: Number(form.def), phy: Number(form.phy),
@@ -462,12 +754,26 @@ function PlayersContent() {
 
       await setDoc(doc(db, 'players', playerId), playerData);
 
+      // Firestore에서 실제 저장된 값을 다시 읽어와서 표시
+      const savedDoc = await getDoc(doc(db, 'players', playerId));
+      const savedData = savedDoc.data()!;
       const updatedPlayer: Player = {
-        ...playerData,
         id: playerId,
-        photo: photoURL ?? undefined,
-        modelPhoto: modelPhotoURL ?? undefined,
+        no: savedData.no,
+        name: savedData.name,
+        pos: savedData.pos,
+        positions: savedData.positions ?? [savedData.pos],
+        grade: savedData.grade,
+        honorary: savedData.honorary ?? false,
+        stats: savedData.stats ?? { spd: 0, sht: 0, pas: 0, dri: 0, def: 0, phy: 0 },
+        photoURL: savedData.photoURL ?? null,
+        modelPhotoURL: savedData.modelPhotoURL ?? null,
+        photo: savedData.photoURL ?? undefined,
+        modelPhoto: savedData.modelPhotoURL ?? undefined,
       };
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
 
       if (editMode && selected) {
         setPlayers(prev => prev.map(p => p.id === selected.id ? updatedPlayer : p));
@@ -667,7 +973,7 @@ function PlayersContent() {
                         📷 사진 선택
                       </button>
                       {form.photo && (
-                        <button type="button" onClick={() => setForm(f => ({ ...f, photo: '' }))}
+                        <button type="button" onClick={() => setForm(f => ({ ...f, photo: '', photoCleared: true }))}
                           className="text-xs text-red-500/70 hover:text-red-400 transition-colors block">
                           사진 제거
                         </button>
@@ -678,9 +984,9 @@ function PlayersContent() {
                   </div>
                 </div>
 
-                {/* 3D 유니폼 사진 */}
+                {/* 로고 사진 */}
                 <div>
-                  <label className={lCls}>3D 유니폼 사진</label>
+                  <label className={lCls}>로고 사진</label>
                   <div className="flex items-center gap-4">
                     <div
                       className="flex-shrink-0 flex items-center justify-center overflow-hidden"
@@ -702,15 +1008,15 @@ function PlayersContent() {
                     <div className="space-y-2">
                       <button type="button" onClick={() => modelFileRef.current?.click()}
                         className="px-4 py-2 text-xs font-bold text-white/60 border border-white/20 hover:border-white/40 transition-colors block w-full">
-                        👕 3D 사진 선택
+                        🖼 로고 사진 선택
                       </button>
                       {form.modelPhoto && (
-                        <button type="button" onClick={() => setForm(f => ({ ...f, modelPhoto: '' }))}
+                        <button type="button" onClick={() => setForm(f => ({ ...f, modelPhoto: '', modelPhotoCleared: true }))}
                           className="text-xs text-red-500/70 hover:text-red-400 transition-colors block">
                           사진 제거
                         </button>
                       )}
-                      <p className="text-[11px] text-white/20">모델링 이미지 PNG 권장</p>
+                      <p className="text-[11px] text-white/20">PNG 권장 (배경 투명)</p>
                     </div>
                     <input ref={modelFileRef} type="file" accept="image/*" className="hidden" onChange={handleModelPhotoChange} />
                   </div>
@@ -756,6 +1062,40 @@ function PlayersContent() {
                     </div>
                   </div>
                 </div>
+
+                {/* 명예회원 */}
+                <label
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-all"
+                  style={{
+                    backgroundColor: form.honorary ? 'rgba(251,191,36,0.08)' : '#0a0a0a',
+                    border: `1px solid ${form.honorary ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                    borderRadius: 4,
+                  }}
+                >
+                  <div
+                    className="flex-shrink-0 flex items-center justify-center transition-all"
+                    style={{
+                      width: 20, height: 20, borderRadius: 4,
+                      backgroundColor: form.honorary ? '#f59e0b' : 'transparent',
+                      border: `2px solid ${form.honorary ? '#f59e0b' : 'rgba(255,255,255,0.2)'}`,
+                      boxShadow: form.honorary ? '0 0 10px #f59e0b60' : 'none',
+                    }}
+                    onClick={() => setForm(f => ({ ...f, honorary: !f.honorary }))}
+                  >
+                    {form.honorary && <span style={{ color: '#000', fontSize: 12, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                  </div>
+                  <input type="checkbox" checked={form.honorary}
+                    onChange={e => setForm(f => ({ ...f, honorary: e.target.checked }))}
+                    className="hidden" />
+                  <div>
+                    <div className="font-bold text-sm" style={{ color: form.honorary ? '#fbbf24' : 'rgba(255,255,255,0.5)' }}>
+                      ★ 명예회원
+                    </div>
+                    <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                      체크 시 카드가 골드 테마로 변경됩니다
+                    </div>
+                  </div>
+                </label>
 
                 {/* 능력치 */}
                 <div className="border border-white/10 p-4" style={{ backgroundColor: '#080808' }}>
@@ -816,6 +1156,20 @@ function PlayersContent() {
         </div>
       )}
       {adminModal}
+
+      {/* ── 저장 성공 토스트 ── */}
+      {saveSuccess && (
+        <div style={{
+          position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9999, backgroundColor: '#16a34a', color: '#fff',
+          padding: '12px 24px', borderRadius: 8, fontWeight: 800, fontSize: 14,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', gap: 8,
+          animation: 'slideUp 0.3s ease',
+        }}>
+          ✓ 저장되었습니다
+        </div>
+      )}
     </div>
   );
 }
