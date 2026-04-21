@@ -8,6 +8,7 @@ import {
   collection, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, orderBy, query
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import Image from 'next/image';
 
 const USER_AUTH_KEY = 'taes-user-login';
 
@@ -30,6 +31,14 @@ function compressImage(file: File, maxDim = 1600, quality = 0.85): Promise<strin
     };
     img.src = url;
   });
+}
+
+// ── 썸네일 이미지 생성 (그리드용) ──
+function generateThumbnailUrl(url: string, size: 'small' | 'medium' = 'small'): string {
+  if (!url || !url.includes('firebasestorage')) return url;
+  // Firebase Storage에 이미지 최적화 파라미터 추가
+  const sizePixels = size === 'small' ? 300 : 600;
+  return `${url}&w=${sizePixels}&h=${sizePixels}&q=80`;
 }
 
 // ── dataUrl → Blob (fetch 없이 순수 JS 변환) ──
@@ -74,6 +83,8 @@ export default function GalleryPage() {
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
 
   const [lightbox, setLightbox] = useState<{ albumId: string; itemIdx: number } | null>(null);
+  const [touchStart, setTouchStart] = useState(0);
+  const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -87,6 +98,28 @@ export default function GalleryPage() {
     loadData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  // ── 터치 스와이프 처리 ──
+  function handleTouchStart(e: React.TouchEvent) {
+    setTouchStart(e.touches[0].clientX);
+  }
+
+  function handleTouchEnd(e: React.TouchEvent, onPrev: () => void, onNext: () => void) {
+    if (!touchStart) return;
+    const touchEnd = e.changedTouches[0].clientX;
+    const diff = touchStart - touchEnd;
+
+    // 50px 이상 움직였을 때만 동작
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) {
+        // 왼쪽으로 스와이프 → 다음 사진
+        onNext();
+      } else {
+        // 오른쪽으로 스와이프 → 이전 사진
+        onPrev();
+      }
+    }
+  }
 
   async function loadData() {
     setLoading(true);
@@ -307,27 +340,27 @@ export default function GalleryPage() {
         {/* ── 앨범 내부 뷰 ── */}
         {openAlbum ? (
           <div>
-            <div className="flex flex-wrap items-center gap-3 mb-6">
-              <button onClick={() => setOpenAlbum(null)} className="text-sm text-white/50 hover:text-white transition-colors">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-6">
+              <button onClick={() => setOpenAlbum(null)} className="text-sm text-white/50 hover:text-white transition-colors text-left">
                 ← 앨범 목록
               </button>
-              <div className="text-white/20">|</div>
-              <div>
-                <span className="text-white font-bold">{openAlbum.title}</span>
-                <span className="text-white/30 text-sm ml-2">{openAlbum.date} · {openAlbum.items.length}개</span>
+              <div className="text-white/20 hidden sm:block">|</div>
+              <div className="flex-1 min-w-0">
+                <span className="text-white font-bold block sm:inline">{openAlbum.title}</span>
+                <span className="text-white/30 text-xs sm:text-sm ml-0 sm:ml-2 block sm:inline">{openAlbum.date} · {openAlbum.items.length}개</span>
               </div>
-              <div className="ml-auto flex gap-2">
+              <div className="flex gap-2 flex-col sm:flex-row w-full sm:w-auto">
                 <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAlbumFileSelect} />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-5 py-2 text-sm font-bold text-white hover:opacity-80 transition-colors"
+                  className="px-4 py-2.5 sm:py-2 text-sm font-bold text-white hover:opacity-80 transition-colors flex-1 sm:flex-none touch-manipulation"
                   style={{ backgroundColor: '#CC0000' }}
                 >
                   + 추가
                 </button>
                 <button
                   onClick={() => handleDeleteAlbum(openAlbum.id)}
-                  className="px-4 py-2 text-sm font-bold text-white/50 hover:text-red-400 border border-white/10 hover:border-red-800/50 transition-colors"
+                  className="px-4 py-2.5 sm:py-2 text-sm font-bold text-white/50 hover:text-red-400 border border-white/10 hover:border-red-800/50 transition-colors flex-1 sm:flex-none touch-manipulation"
                 >
                   앨범 삭제
                 </button>
@@ -344,15 +377,26 @@ export default function GalleryPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                 {openAlbum.items.map((item, idx) => {
                   const isFeatured = featuredPhotoId === item.id;
+                  const isLoading = imageLoading[item.id];
+                  const thumbnailUrl = generateThumbnailUrl(item.url, 'small');
                   return (
-                  <div key={item.id} className="relative group aspect-square">
+                  <div key={item.id} className="relative group aspect-square bg-white/5 rounded overflow-hidden">
+                    {isLoading && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent animate-pulse" />
+                    )}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={item.url}
+                      src={thumbnailUrl}
                       alt={item.name}
-                      className="w-full h-full object-cover cursor-pointer border transition-colors"
-                      style={{ borderColor: isFeatured ? '#CC0000' : 'rgba(255,255,255,0.1)' }}
+                      loading="lazy"
+                      className="w-full h-full object-cover cursor-pointer border transition-all duration-300"
+                      style={{ borderColor: isFeatured ? '#CC0000' : 'rgba(255,255,255,0.1)', opacity: isLoading ? 0.5 : 1 }}
                       onClick={() => setLightbox({ albumId: openAlbum.id, itemIdx: idx })}
+                      onLoad={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
+                      onError={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
+                      onLoadingStatusChange={(status) => {
+                        if (status === 'loading') setImageLoading(prev => ({ ...prev, [item.id]: true }));
+                      }}
                     />
                     {isFeatured && (
                       <div className="absolute bottom-1 left-1 text-white text-[9px] font-black px-1.5 py-0.5 z-10" style={{ backgroundColor: '#CC0000' }}>
@@ -384,18 +428,18 @@ export default function GalleryPage() {
         ) : (
           <>
             {/* Controls */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
-              <div className="flex border border-white/10">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8">
+              <div className="flex border border-white/10 w-full sm:w-auto">
                 <button
                   onClick={() => setView('albums')}
-                  className="px-5 py-2 text-sm font-bold transition-colors"
+                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 sm:py-2 text-sm font-bold transition-colors touch-manipulation"
                   style={{ backgroundColor: view === 'albums' ? '#CC0000' : '#080808', color: view === 'albums' ? '#fff' : 'rgba(255,255,255,0.5)' }}
                 >
                   앨범
                 </button>
                 <button
                   onClick={() => setView('all')}
-                  className="px-5 py-2 text-sm font-bold transition-colors"
+                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 sm:py-2 text-sm font-bold transition-colors touch-manipulation"
                   style={{ backgroundColor: view === 'all' ? '#CC0000' : '#080808', color: view === 'all' ? '#fff' : 'rgba(255,255,255,0.5)' }}
                 >
                   전체
@@ -404,7 +448,7 @@ export default function GalleryPage() {
 
               <button
                 onClick={() => requireAdmin(() => { setShowUpload(true); if (albums.length) setUploadAlbumId(albums[0].id); })}
-                className="sm:ml-auto px-6 py-2 text-sm font-bold text-white hover:opacity-80 transition-colors flex items-center gap-2"
+                className="px-4 py-2.5 sm:py-2 sm:ml-auto text-sm font-bold text-white hover:opacity-80 transition-colors flex items-center justify-center sm:justify-start gap-2 touch-manipulation"
                 style={{ backgroundColor: '#CC0000' }}
               >
                 📷 사진 업로드
@@ -429,8 +473,21 @@ export default function GalleryPage() {
                     >
                       <div className="aspect-video flex items-center justify-center border-b border-white/5 overflow-hidden relative" style={{ backgroundColor: '#0e0e0e' }}>
                         {album.items[0] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={album.items[0].url} alt="thumb" className="w-full h-full object-cover" />
+                          <>
+                            {imageLoading[album.items[0].id] && (
+                              <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent animate-pulse" />
+                            )}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={generateThumbnailUrl(album.items[0].url, 'medium')}
+                              alt="thumb"
+                              loading="lazy"
+                              className="w-full h-full object-cover transition-opacity duration-300"
+                              style={{ opacity: imageLoading[album.items[0].id] ? 0.5 : 1 }}
+                              onLoad={() => setImageLoading(prev => ({ ...prev, [album.items[0].id]: false }))}
+                              onError={() => setImageLoading(prev => ({ ...prev, [album.items[0].id]: false }))}
+                            />
+                          </>
                         ) : (
                           <span className="text-5xl text-white/10">📷</span>
                         )}
@@ -472,16 +529,31 @@ export default function GalleryPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                    {allItems.map((item, idx) => (
+                    {allItems.map((item, idx) => {
+                      const isLoading = imageLoading[item.id];
+                      const thumbnailUrl = generateThumbnailUrl(item.url, 'small');
+                      return (
                       <div
                         key={item.id}
-                        className="relative group aspect-square cursor-pointer"
+                        className="relative group aspect-square cursor-pointer bg-white/5 rounded overflow-hidden"
                         onClick={() => setLightbox({ albumId: item.albumId, itemIdx: idx })}
                       >
+                        {isLoading && (
+                          <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent animate-pulse" />
+                        )}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={item.url} alt={item.name} className="w-full h-full object-cover border border-white/10 hover:border-red-800/50 transition-colors" />
+                        <img
+                          src={thumbnailUrl}
+                          alt={item.name}
+                          loading="lazy"
+                          className="w-full h-full object-cover border border-white/10 hover:border-red-800/50 transition-all duration-300"
+                          style={{ opacity: isLoading ? 0.5 : 1 }}
+                          onLoad={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
+                          onError={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
+                        />
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                 )}
               </div>
@@ -574,14 +646,14 @@ export default function GalleryPage() {
             {uploadPreviews.length > 0 && (
               <div className="mb-4">
                 <div className="text-xs text-white/40 mb-2">{uploadPreviews.length}장 선택됨</div>
-                <div className="grid grid-cols-5 gap-1 max-h-40 overflow-y-auto">
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-1 max-h-40 overflow-y-auto">
                   {uploadPreviews.map((p, i) => (
-                    <div key={i} className="relative aspect-square group">
+                    <div key={i} className="relative aspect-square group bg-white/5 rounded overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={p.dataUrl} alt={p.name} className="w-full h-full object-cover border border-white/10" />
                       <button
                         onClick={() => setUploadPreviews(prev => prev.filter((_, idx) => idx !== i))}
-                        className="absolute top-0 right-0 w-5 h-5 bg-black/80 text-white/70 hover:text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-0 right-0 w-6 h-6 bg-black/80 text-white/70 hover:text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 sm:group-hover:opacity-100 transition-opacity touch-manipulation"
                       >
                         ✕
                       </button>
@@ -615,20 +687,60 @@ export default function GalleryPage() {
         const item = items[lightbox.itemIdx];
         if (!item) return null;
         const total = items.length;
+
+        const handlePrev = () => {
+          if (lightbox.itemIdx > 0) {
+            setLightbox(l => l ? { ...l, itemIdx: l.itemIdx - 1 } : null);
+          }
+        };
+
+        const handleNext = () => {
+          if (lightbox.itemIdx < total - 1) {
+            setLightbox(l => l ? { ...l, itemIdx: l.itemIdx + 1 } : null);
+          }
+        };
+
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.97)' }} onClick={() => setLightbox(null)}>
-            <button className="absolute top-4 right-4 text-white/50 hover:text-white text-2xl z-10 p-2" onClick={() => setLightbox(null)}>✕</button>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(0,0,0,0.97)' }}
+            onClick={() => setLightbox(null)}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={(e) => handleTouchEnd(e, handlePrev, handleNext)}
+          >
+            <button className="absolute top-3 right-3 sm:top-4 sm:right-4 text-white/50 hover:text-white text-2xl z-10 p-2 touch-manipulation" onClick={() => setLightbox(null)}>✕</button>
+
             {lightbox.itemIdx > 0 && (
-              <button className="absolute left-2 sm:left-6 text-white/50 hover:text-white text-5xl z-10 p-4" onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, itemIdx: l.itemIdx - 1 } : null); }}>‹</button>
+              <button
+                className="absolute left-2 sm:left-6 text-white/50 hover:text-white text-4xl sm:text-5xl z-10 p-3 sm:p-4 touch-manipulation active:scale-110 transition-transform"
+                onClick={e => { e.stopPropagation(); handlePrev(); }}
+              >
+                ‹
+              </button>
             )}
-            <div className="max-w-5xl w-full px-16" onClick={e => e.stopPropagation()}>
+
+            <div className="max-w-5xl w-full px-4 sm:px-16" onClick={e => e.stopPropagation()}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={item.url} alt={item.name} className="max-h-[85vh] mx-auto object-contain" style={{ maxHeight: '85vh', maxWidth: '100%' }} />
+              <img
+                src={item.url}
+                alt={item.name}
+                className="max-h-[85vh] mx-auto object-contain"
+                style={{ maxHeight: '85vh', maxWidth: '100%' }}
+                onLoad={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
+                onError={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
+              />
             </div>
+
             {lightbox.itemIdx < total - 1 && (
-              <button className="absolute right-2 sm:right-6 text-white/50 hover:text-white text-5xl z-10 p-4" onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, itemIdx: l.itemIdx + 1 } : null); }}>›</button>
+              <button
+                className="absolute right-2 sm:right-6 text-white/50 hover:text-white text-4xl sm:text-5xl z-10 p-3 sm:p-4 touch-manipulation active:scale-110 transition-transform"
+                onClick={e => { e.stopPropagation(); handleNext(); }}
+              >
+                ›
+              </button>
             )}
-            <div className="absolute bottom-4 text-white/30 text-sm">{lightbox.itemIdx + 1} / {total}</div>
+
+            <div className="absolute bottom-4 text-white/30 text-xs sm:text-sm touch-manipulation select-none">{lightbox.itemIdx + 1} / {total}</div>
           </div>
         );
       })()}

@@ -321,3 +321,34 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #111; }
 ::-webkit-scrollbar-thumb { background: var(--taes-red); border-radius: 3px; }
+
+/* ── 모바일 최적화 ── */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 이미지 로딩 스켈레톤 */
+@keyframes skeleton-loading {
+  0%, 100% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+.skeleton-loading {
+  background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
+  background-size: 1000px 100%;
+  animation: skeleton-loading 2s infinite;
+}
+
+/* 모바일 친화적 버튼 */
+@media (max-width: 640px) {
+  button {
+    min-height: 44px; /* iOS 권장 터치 크기 */
+  }
+}
+
+/* 라이트박스 모바일 최적화 */
+.lightbox-container {
+  overscroll-behavior: contain;
+}
