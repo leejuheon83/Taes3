@@ -1,8 +1,48 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // ── 기본 정책: 모두 거부 (명시적으로 허용된 것만 가능) ──
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read: if false;
+      allow write: if false;
+    }
+
+    // ── 앨범 사진 (공개 읽기, 관리자만 쓰기) ──
+    match /albums/{albumId}/{fileName} {
+      // 읽기: 모든 사용자 (갤러리 공개)
+      allow read: if true;
+
+      // 쓰기: 인증된 요청 + 파일 검증
+      allow write: if request.auth != null
+        && isValidImage()
+        && isValidSize()
+        && isValidPath();
+    }
+
+    // ── 헬퍼 함수들 ──
+    function isValidImage() {
+      // 허용 파일 타입: JPG, PNG, WEBP
+      let contentType = request.resource.contentType;
+      return contentType != null && (
+        contentType.matches('image/jpeg') ||
+        contentType.matches('image/png') ||
+        contentType.matches('image/webp')
+      );
+    }
+
+    function isValidSize() {
+      // 파일 크기 제한: 최대 10MB (로컬 압축되므로 충분함)
+      return request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    function isValidPath() {
+      // 경로 검증: albums/{albumId}/{itemId}.jpg 형식
+      let path = request.path;
+      let fileName = path[2];
+      // 경로가 3 부분으로 구성되고 .jpg로 끝나는지 확인
+      return path[0] == 'albums'
+        && path[1] != null && path[1] != ''  // albumId 존재
+        && fileName != null && fileName.matches('.*\\.jpg$');  // .jpg 확장자
     }
   }
 }
