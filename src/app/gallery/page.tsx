@@ -394,9 +394,6 @@ export default function GalleryPage() {
                       onClick={() => setLightbox({ albumId: openAlbum.id, itemIdx: idx })}
                       onLoad={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
                       onError={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
-                      onLoadingStatusChange={(status) => {
-                        if (status === 'loading') setImageLoading(prev => ({ ...prev, [item.id]: true }));
-                      }}
                     />
                     {isFeatured && (
                       <div className="absolute bottom-1 left-1 text-white text-[9px] font-black px-1.5 py-0.5 z-10" style={{ backgroundColor: '#CC0000' }}>
