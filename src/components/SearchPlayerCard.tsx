@@ -231,18 +231,33 @@ export default function SearchPlayerCard() {
 
             {/* 선수 사진 */}
             <div style={{ position:'absolute', bottom:'22%', left:'50%', transform:'translateX(-50%)',
-              width:'90%', height:'60%', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:10 }}>
+              width:'92%', height:'62%', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:10 }}>
               {player.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={player.image} alt={player.name}
-                  style={{ maxHeight:'100%', maxWidth:'100%', objectFit:'contain',
-                    filter:`drop-shadow(0 4px 18px rgba(0,0,0,0.97)) drop-shadow(0 0 10px ${THEME.glow}40)` }}
-                  onError={e => { (e.currentTarget as HTMLImageElement).style.display='none'; }}
+                <img
+                  src={player.image}
+                  alt={player.name}
+                  style={{
+                    maxHeight:'100%', maxWidth:'100%', objectFit:'contain',
+                    filter:`drop-shadow(0 4px 18px rgba(0,0,0,0.97)) drop-shadow(0 0 12px ${THEME.glow}50)`,
+                  }}
+                  onError={e => {
+                    const el = e.currentTarget as HTMLImageElement;
+                    el.style.display = 'none';
+                    const fallback = el.nextElementSibling as HTMLElement | null;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
                 />
-              ) : (
-                <div style={{ fontSize:38, fontWeight:900, color:THEME.accent, opacity:0.35,
+              ) : null}
+              {/* 사진 없거나 로드 실패 시 fallback */}
+              <div style={{
+                display: player.image ? 'none' : 'flex',
+                flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%'
+              }}>
+                <div style={{ fontSize:42, fontWeight:900, color:THEME.accent, opacity:0.3,
                   textShadow:`0 0 28px ${THEME.glow}` }}>⚽</div>
-              )}
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.2)', marginTop:4 }}>사진 없음</div>
+              </div>
             </div>
 
             {/* 하단 패널 */}
