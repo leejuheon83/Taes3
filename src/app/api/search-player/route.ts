@@ -8,8 +8,6 @@ const LOCAL_PLAYERS: Record<string, any> = {
     stats: { pace:89, shoot:94, pass:65, dribble:80, defense:45, physical:88 } },
   mbappe: { name: 'Kylian Mbappé', club: 'Real Madrid', position: 'Attacker', nationality: 'France', id: '278',
     stats: { pace:97, shoot:90, pass:80, dribble:92, defense:39, physical:76 } },
-  mbappe: { name: 'Kylian Mbappé', club: 'Real Madrid', position: 'Attacker', nationality: 'France', id: '278',
-    stats: { pace:97, shoot:90, pass:80, dribble:92, defense:39, physical:76 } },
   messi: { name: 'Lionel Messi', club: 'Inter Miami', position: 'Attacker', nationality: 'Argentina', id: '154',
     stats: { pace:82, shoot:91, pass:91, dribble:95, defense:34, physical:64 } },
   ronaldo: { name: 'Cristiano Ronaldo', club: 'Al Nassr', position: 'Attacker', nationality: 'Portugal', id: '874',
