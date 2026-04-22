@@ -4,7 +4,7 @@ export async function GET(req: NextRequest) {
   const query = req.nextUrl.searchParams.get('q');
   if (!query) return NextResponse.json({ error: 'query required' }, { status: 400 });
 
-  const apiKey = process.env.FOOTBALL_API_KEY;
+  const apiKey = process.env.FOOTBALL_API_KEY || process.env.NEXT_PUBLIC_FOOTBALL_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'API key not configured' }, { status: 500 });
 
   try {
