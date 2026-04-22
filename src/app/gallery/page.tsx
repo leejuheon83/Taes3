@@ -15,7 +15,7 @@ const USER_AUTH_KEY = 'taes-user-login';
 // ── 이미지 압축 → dataUrl (미리보기용) ──
 function compressImage(file: File, maxDim = 1600, quality = 0.85): Promise<string> {
   return new Promise(resolve => {
-    const img = new Image();
+    const img = document.createElement('img') as HTMLImageElement;
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
