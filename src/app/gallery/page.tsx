@@ -40,6 +40,16 @@ function generateThumbnailUrl(url: string, size: 'small' | 'medium' = 'small'): 
   return `${url}&w=${sizePixels}&h=${sizePixels}&q=80`;
 }
 
+// ── dataUrl → Blob (fetch 없이 순수 JS 변환) ──
+function dataUrlToBlob(dataUrl: string): Blob {
+  const arr = dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)![1];
+  const bstr = atob(arr[1]);
+  const u8arr = new Uint8Array(bstr.length);
+  for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
+  return new Blob([u8arr], { type: mime });
+}
+
 // ── 사진 저장: Storage 대신 Firestore에 base64로 저장 (무료 Spark 요금제 유지) ──
 // 사진 1장 = albums/{albumId}/photos/{itemId} 문서 1개 (문서당 1MB 제한 회피)
 async function savePhotoDoc(albumId: string, itemId: string, dataUrl: string, name: string) {
@@ -288,23 +298,29 @@ export default function GalleryPage() {
 
     setMigrating(true);
     let done = 0, failed = 0;
+    let firstError = '';
     const migratedByAlbum = new Map<string, Map<string, string>>();
     try {
       for (let i = 0; i < targets.length; i++) {
         setMigrateProgress({ current: i + 1, total: targets.length });
         const { albumId, item } = targets[i];
         try {
-          const res = await fetch(item.url);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const blob = await res.blob();
-          let dataUrl = await compressImage(blob, 1200, 0.75);
-          if (dataUrl.length > 700_000) dataUrl = await compressImage(blob, 900, 0.6);
+          // 서버를 거쳐 가져온다 (브라우저에서 Storage로 직접 fetch하면 CORS에 막힘)
+          const res = await fetch(`/api/fetch-photo?url=${encodeURIComponent(item.url)}`);
+          const payload = await res.json();
+          if (!res.ok) throw new Error(payload?.error ?? `HTTP ${res.status}`);
+
+          let dataUrl = await compressImage(dataUrlToBlob(payload.dataUrl), 1200, 0.75);
+          if (dataUrl.length > 700_000) {
+            dataUrl = await compressImage(dataUrlToBlob(payload.dataUrl), 900, 0.6);
+          }
           await savePhotoDoc(albumId, item.id, dataUrl, item.name);
           if (!migratedByAlbum.has(albumId)) migratedByAlbum.set(albumId, new Map());
           migratedByAlbum.get(albumId)!.set(item.id, dataUrl);
           done++;
         } catch (err) {
           console.error('Failed to migrate photo:', item.id, err);
+          if (!firstError) firstError = err instanceof Error ? err.message : String(err);
           failed++;
         }
       }
@@ -324,7 +340,7 @@ export default function GalleryPage() {
       }));
 
       alert(failed
-        ? `복사 완료: ${done}장 성공, ${failed}장 실패. 실패한 사진은 다시 시도해 주세요.`
+        ? `복사 완료: ${done}장 성공, ${failed}장 실패.\n\n실패 원인: ${firstError}`
         : `복사 완료: ${done}장 모두 성공! 이제 요금제를 다시 무료(Spark)로 내려도 됩니다.`);
     } finally {
       setMigrating(false);
