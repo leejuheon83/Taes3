@@ -12,7 +12,7 @@ import Image from 'next/image';
 const USER_AUTH_KEY = 'taes-user-login';
 
 // ── 이미지 압축 → dataUrl (미리보기용) ──
-function compressImage(file: File, maxDim = 1600, quality = 0.85): Promise<string> {
+function compressImage(file: Blob, maxDim = 1600, quality = 0.85): Promise<string> {
   return new Promise(resolve => {
     const img = document.createElement('img') as HTMLImageElement;
     const url = URL.createObjectURL(file);
@@ -78,6 +78,8 @@ export default function GalleryPage() {
   const [uploadAlbumId, setUploadAlbumId] = useState<string>('');
   const [uploadPreviews, setUploadPreviews] = useState<{ dataUrl: string; name: string }[]>([]);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
+  const [migrating, setMigrating] = useState(false);
+  const [migrateProgress, setMigrateProgress] = useState<{ current: number; total: number } | null>(null);
 
   const [lightbox, setLightbox] = useState<{ albumId: string; itemIdx: number } | null>(null);
   const [touchStart, setTouchStart] = useState(0);
@@ -274,6 +276,62 @@ export default function GalleryPage() {
     }
   }
 
+  // ── 예전 Storage 사진을 Firestore로 복사 (Blaze로 일시 업그레이드한 상태에서 실행) ──
+  const oldPhotoCount = albums.reduce(
+    (n, a) => n + a.items.filter(it => it.url.includes('firebasestorage')).length, 0);
+
+  async function handleMigrateOldPhotos() {
+    const targets = albums.flatMap(a =>
+      a.items.filter(it => it.url.includes('firebasestorage')).map(it => ({ albumId: a.id, item: it })));
+    if (!targets.length) return;
+    if (!confirm(`예전 사진 ${targets.length}장을 Firestore로 복사합니다. 진행할까요?\n(Firebase 요금제가 Blaze인 상태에서만 사진을 읽을 수 있습니다)`)) return;
+
+    setMigrating(true);
+    let done = 0, failed = 0;
+    const migratedByAlbum = new Map<string, Map<string, string>>();
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        setMigrateProgress({ current: i + 1, total: targets.length });
+        const { albumId, item } = targets[i];
+        try {
+          const res = await fetch(item.url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const blob = await res.blob();
+          let dataUrl = await compressImage(blob, 1200, 0.75);
+          if (dataUrl.length > 700_000) dataUrl = await compressImage(blob, 900, 0.6);
+          await savePhotoDoc(albumId, item.id, dataUrl, item.name);
+          if (!migratedByAlbum.has(albumId)) migratedByAlbum.set(albumId, new Map());
+          migratedByAlbum.get(albumId)!.set(item.id, dataUrl);
+          done++;
+        } catch (err) {
+          console.error('Failed to migrate photo:', item.id, err);
+          failed++;
+        }
+      }
+
+      // 복사된 항목은 앨범 문서에서 Storage URL을 제거 (다음 로드부터 photos 문서 사용)
+      for (const [albumId, urlMap] of migratedByAlbum) {
+        const album = albums.find(a => a.id === albumId);
+        if (!album) continue;
+        const updatedItems = album.items.map(it =>
+          urlMap.has(it.id) ? { ...it, url: urlMap.get(it.id)! } : it);
+        await updateDoc(doc(db, 'albums', albumId), { items: toItemMeta(updatedItems) });
+      }
+      setAlbums(prev => prev.map(a => {
+        const urlMap = migratedByAlbum.get(a.id);
+        if (!urlMap) return a;
+        return { ...a, items: a.items.map(it => urlMap.has(it.id) ? { ...it, url: urlMap.get(it.id)! } : it) };
+      }));
+
+      alert(failed
+        ? `복사 완료: ${done}장 성공, ${failed}장 실패. 실패한 사진은 다시 시도해 주세요.`
+        : `복사 완료: ${done}장 모두 성공! 이제 요금제를 다시 무료(Spark)로 내려도 됩니다.`);
+    } finally {
+      setMigrating(false);
+      setMigrateProgress(null);
+    }
+  }
+
   async function handleSetFeatured(item: MediaItem) {
     try {
       await setDoc(doc(db, 'settings', 'main'), {
@@ -334,16 +392,16 @@ export default function GalleryPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-10">
 
-        {uploading && (
+        {(uploading || migrating) && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
             <div className="text-white text-center px-8 py-6 rounded-xl" style={{ backgroundColor: '#111' }}>
               <div className="text-3xl mb-3" style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>☁️</div>
-              <div className="font-bold text-lg mb-1">업로드 중...</div>
-              {uploadProgress && (
+              <div className="font-bold text-lg mb-1">{migrating ? '예전 사진 복구 중...' : '업로드 중...'}</div>
+              {(uploadProgress ?? migrateProgress) && (
                 <>
-                  <div className="text-white/50 text-sm mb-3">{uploadProgress.current} / {uploadProgress.total} 장</div>
+                  <div className="text-white/50 text-sm mb-3">{(uploadProgress ?? migrateProgress)!.current} / {(uploadProgress ?? migrateProgress)!.total} 장</div>
                   <div className="w-48 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#333' }}>
-                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%`, backgroundColor: '#CC0000' }} />
+                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${((uploadProgress ?? migrateProgress)!.current / (uploadProgress ?? migrateProgress)!.total) * 100}%`, backgroundColor: '#CC0000' }} />
                   </div>
                 </>
               )}
@@ -457,9 +515,19 @@ export default function GalleryPage() {
                 </button>
               </div>
 
+              {oldPhotoCount > 0 && !loading && (
+                <button
+                  onClick={() => requireAdmin(handleMigrateOldPhotos)}
+                  className="px-4 py-2.5 sm:py-2 sm:ml-auto text-sm font-bold border transition-colors touch-manipulation"
+                  style={{ color: '#f59e0b', borderColor: 'rgba(245,158,11,0.5)' }}
+                  title="Blaze 요금제 상태에서 예전 Storage 사진을 Firestore로 복사합니다"
+                >
+                  ♻️ 예전 사진 복구 ({oldPhotoCount}장)
+                </button>
+              )}
               <button
                 onClick={() => requireAdmin(() => { setShowUpload(true); if (albums.length) setUploadAlbumId(albums[0].id); })}
-                className="px-4 py-2.5 sm:py-2 sm:ml-auto text-sm font-bold text-white hover:opacity-80 transition-colors flex items-center justify-center sm:justify-start gap-2 touch-manipulation"
+                className={`px-4 py-2.5 sm:py-2 ${oldPhotoCount > 0 ? '' : 'sm:ml-auto'} text-sm font-bold text-white hover:opacity-80 transition-colors flex items-center justify-center sm:justify-start gap-2 touch-manipulation`}
                 style={{ backgroundColor: '#CC0000' }}
               >
                 📷 사진 업로드
