@@ -339,7 +339,7 @@ export default function Home() {
       <section className="relative flex items-center overflow-hidden" style={{ minHeight: 620 }}>
         {/* 배경 이미지 (선수) */}
         <Image
-          src="/taes-hero-bg.jpg"
+          src="/taes-hero-bg-kids.jpg"
           alt=""
           aria-hidden
           fill
