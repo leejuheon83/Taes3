@@ -240,40 +240,10 @@ body {
 }
 
 /* ── 로고 플로팅 (인트로 후 유지) ── */
-@keyframes logo-float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-10px); }
-}
 
-/* ── 불꽃 인트로: 로고 등장 ── */
-@keyframes logo-reveal {
-  0%   { opacity: 0; transform: scale(0.4); filter: brightness(4) saturate(0) blur(8px); }
-  25%  { opacity: 1; transform: scale(1.15); filter: brightness(3) saturate(2) blur(2px); }
-  55%  { transform: scale(0.97); filter: brightness(1.8) saturate(1.5) blur(0px); }
-  80%  { transform: scale(1.04); filter: brightness(1.2) saturate(1.2); }
-  100% { transform: scale(1);    filter: brightness(1) saturate(1); }
-}
 
-/* ── 불꽃 기둥: 아래서 위로 치솟았다 사그라짐 ── */
-@keyframes flame-tongue {
-  0%   { transform: scaleY(0) translateY(0); opacity: 0; }
-  15%  { transform: scaleY(1.3) translateY(-20px); opacity: 1; }
-  50%  { transform: scaleY(1) translateY(-10px); opacity: 0.85; }
-  100% { transform: scaleY(0.2) translateY(20px); opacity: 0; }
-}
 
-/* ── 폭발 링 ── */
-@keyframes flame-burst {
-  0%   { transform: scale(0.2); opacity: 1; }
-  60%  { transform: scale(1.6); opacity: 0.6; }
-  100% { transform: scale(2.4); opacity: 0; }
-}
 
-/* ── 불씨 파티클 ── */
-@keyframes ember-fly {
-  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(var(--ex), var(--ey)) scale(0); opacity: 0; }
-}
 
 /* ── 지속 글로우 (인트로 끝난 뒤) ── */
 @keyframes after-glow {
@@ -289,28 +259,9 @@ body {
 .glow-pulse        { animation: glow-pulse 2s ease-in-out infinite; }
 .hero-text-glow    { animation: hero-text-glow 2.5s ease-in-out infinite; }
 
-/* 로고 등장: 1회만, 끝나면 float 유지 */
-.logo-reveal {
-  animation:
-    logo-reveal 1.6s cubic-bezier(0.22,1,0.36,1) forwards,
-    logo-float  3.5s ease-in-out 1.6s infinite;
-}
 
-/* 불꽃 기둥들 */
-.flame-t1 { transform-origin: bottom center; animation: flame-tongue 1.4s ease-out 0.1s 1 forwards; }
-.flame-t2 { transform-origin: bottom center; animation: flame-tongue 1.6s ease-out 0.0s 1 forwards; }
-.flame-t3 { transform-origin: bottom center; animation: flame-tongue 1.2s ease-out 0.2s 1 forwards; }
-.flame-t4 { transform-origin: bottom center; animation: flame-tongue 1.5s ease-out 0.15s 1 forwards; }
-.flame-t5 { transform-origin: bottom center; animation: flame-tongue 1.3s ease-out 0.05s 1 forwards; }
-.flame-t6 { transform-origin: bottom center; animation: flame-tongue 1.7s ease-out 0.25s 1 forwards; }
 
-/* 폭발 링 */
-.flame-burst1 { animation: flame-burst 1.0s ease-out 0.05s 1 forwards; }
-.flame-burst2 { animation: flame-burst 1.3s ease-out 0.2s  1 forwards; }
-.flame-burst3 { animation: flame-burst 1.6s ease-out 0.35s 1 forwards; }
 
-/* 불씨 */
-.ember { animation: ember-fly 1.2s ease-out forwards; }
 
 /* 잔광 (인트로 후) */
 .after-glow { animation: after-glow 2.5s ease-in-out 1.6s infinite; }
