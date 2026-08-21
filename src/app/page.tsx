@@ -277,6 +277,15 @@ export default function Home() {
         // Load latest gallery photos (최대 6장)
         const albumSnap = await getDocs(query(collection(db, 'albums'), orderBy('date', 'desc')));
         const photos: string[] = [];
+        // 사진 본문은 albums/{id}/photos 하위 문서에 base64로 저장되어 있다
+        for (const albumDoc of albumSnap.docs) {
+          const photoSnap = await getDocs(collection(db, 'albums', albumDoc.id, 'photos'));
+          for (const ph of photoSnap.docs) {
+            const data = (ph.data() as { data?: string }).data;
+            if (data) { photos.push(data); if (photos.length >= 6) break; }
+          }
+          if (photos.length >= 6) break;
+        }
         for (const albumDoc of albumSnap.docs) {
           const items = albumDoc.data().items as { url: string }[] | undefined;
           if (items) {
@@ -369,16 +378,19 @@ export default function Home() {
                 </span>
               </div>
 
-              <Image
-                src="/taes-title.png"
-                alt="TAES FC PREMIER"
-                width={1178}
-                height={544}
-                priority
-                sizes="(max-width: 1024px) 84vw, 560px"
-                className="w-full h-auto mx-auto lg:mx-0"
-                style={{ maxWidth: 560, filter: 'drop-shadow(0 12px 30px rgba(0,0,0,0.7))' }}
-              />
+              <div className="title-wrap">
+                <Image
+                  src="/taes-title.png"
+                  alt="TAES FC PREMIER"
+                  width={1178}
+                  height={544}
+                  priority
+                  sizes="(max-width: 1024px) 84vw, 560px"
+                  className="w-full h-auto"
+                  style={{ filter: 'drop-shadow(0 12px 30px rgba(0,0,0,0.7))' }}
+                />
+                <div className="title-shine" aria-hidden />
+              </div>
 
               <p className="text-white/75 text-base sm:text-lg leading-relaxed mt-3">
                 서툰 시작도 괜찮습니다.<br />
@@ -389,8 +401,7 @@ export default function Home() {
             </div>
 
             {/* 우: 엠블럼 (외곽을 도는 불빛) */}
-            <div className="flex-shrink-0 emblem-wrap" style={{ width: 'min(58vw, 370px)' }}>
-              <div className="emblem-glow" aria-hidden />
+            <div className="flex-shrink-0" style={{ width: 'min(58vw, 370px)' }}>
               <Image
                 src="/taes-emblem.png"
                 alt="TAES FC 엠블럼"
@@ -401,7 +412,6 @@ export default function Home() {
                 className="w-full h-auto relative"
                 style={{ filter: 'drop-shadow(0 0 30px rgba(204,0,0,0.45)) drop-shadow(0 12px 28px rgba(0,0,0,0.7))' }}
               />
-              <div className="emblem-shine" aria-hidden />
             </div>
 
           </div>
