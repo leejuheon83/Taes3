@@ -3,11 +3,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { useRouter } from 'next/navigation';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import {
   collection, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, orderBy, query
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import Image from 'next/image';
 
 const USER_AUTH_KEY = 'taes-user-login';
@@ -41,22 +40,20 @@ function generateThumbnailUrl(url: string, size: 'small' | 'medium' = 'small'): 
   return `${url}&w=${sizePixels}&h=${sizePixels}&q=80`;
 }
 
-// ── dataUrl → Blob (fetch 없이 순수 JS 변환) ──
-function dataUrlToBlob(dataUrl: string): Blob {
-  const arr = dataUrl.split(',');
-  const mime = arr[0].match(/:(.*?);/)![1];
-  const bstr = atob(arr[1]);
-  const u8arr = new Uint8Array(bstr.length);
-  for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
-  return new Blob([u8arr], { type: mime });
+// ── 사진 저장: Storage 대신 Firestore에 base64로 저장 (무료 Spark 요금제 유지) ──
+// 사진 1장 = albums/{albumId}/photos/{itemId} 문서 1개 (문서당 1MB 제한 회피)
+async function savePhotoDoc(albumId: string, itemId: string, dataUrl: string, name: string) {
+  await setDoc(doc(db, 'albums', albumId, 'photos', itemId), { data: dataUrl, name });
 }
 
-// ── Firebase Storage 업로드 → 다운로드 URL 반환 ──
-async function uploadToStorage(albumId: string, itemId: string, dataUrl: string): Promise<string> {
-  const blob = dataUrlToBlob(dataUrl);
-  const storageRef = ref(storage, `albums/${albumId}/${itemId}.jpg`);
-  await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
-  return getDownloadURL(storageRef);
+// 앨범 문서의 items 배열에는 base64를 넣지 않는다 (1MB 제한 초과 방지)
+function toItemMeta(items: MediaItem[]) {
+  return items.map(it => ({
+    id: it.id,
+    name: it.name,
+    type: it.type,
+    url: it.url.startsWith('data:') ? '' : it.url,
+  }));
 }
 
 type MediaItem = { id: string; url: string; name: string; type: 'photo' };
@@ -126,10 +123,25 @@ export default function GalleryPage() {
     try {
       const q = query(collection(db, 'albums'), orderBy('date', 'desc'));
       const snap = await getDocs(q);
-      const loaded: Album[] = snap.docs.map(d => ({
-        id: d.id,
-        ...(d.data() as Omit<Album, 'id'>),
-      }));
+      const loaded: Album[] = [];
+      for (const d of snap.docs) {
+        const albumData = d.data() as Omit<Album, 'id'>;
+        let items = albumData.items ?? [];
+        try {
+          // base64 사진은 photos 하위 컬렉션에서 불러와 합친다
+          const photosSnap = await getDocs(collection(db, 'albums', d.id, 'photos'));
+          if (!photosSnap.empty) {
+            const dataMap = new Map(
+              photosSnap.docs.map(p => [p.id, (p.data() as { data?: string }).data])
+            );
+            items = items.map(it => {
+              const data = dataMap.get(it.id);
+              return data ? { ...it, url: data } : it;
+            });
+          }
+        } catch { /* 하위 컬렉션이 없으면 기존 url 그대로 사용 */ }
+        loaded.push({ id: d.id, ...albumData, items });
+      }
       setAlbums(loaded);
 
       // Load featured photo id from settings
@@ -170,12 +182,12 @@ export default function GalleryPage() {
     if (!confirm('앨범을 삭제하면 사진도 모두 삭제됩니다. 계속할까요?')) return;
     const album = albums.find(a => a.id === id);
     try {
-      // Storage 파일 삭제 (base64 항목은 무시)
+      // photos 하위 문서 삭제 (앨범 문서 삭제로는 하위 컬렉션이 지워지지 않음)
       if (album) {
         for (const item of album.items) {
           try {
-            await deleteObject(ref(storage, `albums/${id}/${item.id}.jpg`));
-          } catch { /* base64 항목이거나 이미 삭제됨 */ }
+            await deleteDoc(doc(db, 'albums', id, 'photos', item.id));
+          } catch { /* 하위 문서가 없으면 무시 */ }
         }
       }
       await deleteDoc(doc(db, 'albums', id));
@@ -189,7 +201,9 @@ export default function GalleryPage() {
 
   async function readFiles(files: File[]): Promise<{ dataUrl: string; name: string }[]> {
     return Promise.all(files.map(async file => {
-      const dataUrl = await compressImage(file, 1200, 0.75);
+      let dataUrl = await compressImage(file, 1200, 0.75);
+      // Firestore 문서 1MB 제한 대비: 너무 크면 더 강하게 압축
+      if (dataUrl.length > 700_000) dataUrl = await compressImage(file, 900, 0.6);
       return { dataUrl, name: file.name };
     }));
   }
@@ -215,13 +229,13 @@ export default function GalleryPage() {
         const preview = uploadPreviews[i];
         setUploadProgress({ current: i + 1, total });
         const itemId = String(Date.now() + i).replace('.', '');
-        // Firebase Storage에 업로드 → 다운로드 URL 저장
-        const downloadUrl = await uploadToStorage(uploadAlbumId, itemId, preview.dataUrl);
-        newItems.push({ id: itemId, url: downloadUrl, name: preview.name, type: 'photo' });
+        // Firestore photos 하위 문서에 base64 저장
+        await savePhotoDoc(uploadAlbumId, itemId, preview.dataUrl, preview.name);
+        newItems.push({ id: itemId, url: preview.dataUrl, name: preview.name, type: 'photo' });
       }
 
       const updatedItems = [...album.items, ...newItems];
-      await updateDoc(doc(db, 'albums', uploadAlbumId), { items: updatedItems });
+      await updateDoc(doc(db, 'albums', uploadAlbumId), { items: toItemMeta(updatedItems) });
 
       setAlbums(prev => prev.map(a => a.id === uploadAlbumId ? { ...a, items: updatedItems } : a));
       if (openAlbum?.id === uploadAlbumId) {
@@ -243,13 +257,13 @@ export default function GalleryPage() {
     const album = albums.find(a => a.id === albumId);
     if (!album) return;
     try {
-      // Storage 파일 삭제 시도 (base64 항목은 무시)
+      // photos 하위 문서 삭제 시도 (예전 Storage 항목은 하위 문서가 없음)
       try {
-        await deleteObject(ref(storage, `albums/${albumId}/${itemId}.jpg`));
-      } catch { /* base64 항목이거나 이미 삭제됨 */ }
+        await deleteDoc(doc(db, 'albums', albumId, 'photos', itemId));
+      } catch { /* 하위 문서가 없으면 무시 */ }
 
       const updatedItems = album.items.filter(p => p.id !== itemId);
-      await updateDoc(doc(db, 'albums', albumId), { items: updatedItems });
+      await updateDoc(doc(db, 'albums', albumId), { items: toItemMeta(updatedItems) });
       setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, items: updatedItems } : a));
       if (openAlbum?.id === albumId) {
         setOpenAlbum(prev => prev ? { ...prev, items: updatedItems } : null);
@@ -288,12 +302,12 @@ export default function GalleryPage() {
         const preview = previews[i];
         setUploadProgress({ current: i + 1, total });
         const itemId = String(Date.now() + i).replace('.', '');
-        const downloadUrl = await uploadToStorage(openAlbum.id, itemId, preview.dataUrl);
-        newItems.push({ id: itemId, url: downloadUrl, name: preview.name, type: 'photo' });
+        await savePhotoDoc(openAlbum.id, itemId, preview.dataUrl, preview.name);
+        newItems.push({ id: itemId, url: preview.dataUrl, name: preview.name, type: 'photo' });
       }
 
       const updatedItems = [...openAlbum.items, ...newItems];
-      await updateDoc(doc(db, 'albums', openAlbum.id), { items: updatedItems });
+      await updateDoc(doc(db, 'albums', openAlbum.id), { items: toItemMeta(updatedItems) });
       setAlbums(prev => prev.map(a => a.id === openAlbum.id ? { ...a, items: updatedItems } : a));
       setOpenAlbum(prev => prev ? { ...prev, items: updatedItems } : null);
     } catch (err) {
