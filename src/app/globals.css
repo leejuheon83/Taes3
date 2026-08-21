@@ -206,3 +206,62 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .card-beam::before { animation: none; }
 }
+
+/* ── 엠블럼: 외곽을 따라 흐르는 불빛 + 잔광 ── */
+.emblem-wrap { position: relative; display: block; }
+
+/* 뒤에서 은은하게 번지는 붉은 잔광 */
+.emblem-glow {
+  position: absolute;
+  inset: -14%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle,
+    rgba(255, 70, 40, 0.38) 0%,
+    rgba(204, 0, 0, 0.20) 42%,
+    transparent 70%);
+  filter: blur(10px);
+  animation: emblem-glow-pulse 3.2s ease-in-out infinite;
+}
+@keyframes emblem-glow-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.05); }
+}
+
+/* 엠블럼 실루엣을 따라 도는 빛 */
+.emblem-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  mix-blend-mode: plus-lighter;
+  -webkit-mask: url('/taes-emblem.png') center / contain no-repeat;
+  mask: url('/taes-emblem.png') center / contain no-repeat;
+}
+.emblem-shine::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 220%;
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 244deg,
+    rgba(255, 190, 150, 0.25) 268deg,
+    rgba(255, 235, 210, 0.75) 292deg,
+    rgba(255, 255, 255, 0.95) 300deg,
+    rgba(255, 235, 210, 0.75) 308deg,
+    rgba(255, 190, 150, 0.25) 332deg,
+    transparent 360deg
+  );
+  animation: emblem-shine-spin 4.5s linear infinite;
+}
+@keyframes emblem-shine-spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emblem-glow, .emblem-shine::before { animation: none; }
+}

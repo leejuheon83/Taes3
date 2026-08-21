@@ -360,7 +360,7 @@ export default function Home() {
 
             {/* 좌: 타이틀 로고 + 문구 */}
             <div className="flex-1 min-w-0 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-5"
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-3"
                 style={{ background: 'rgba(140,0,0,0.38)', border: '1px solid rgba(255,60,40,0.55)' }}>
                 <span className="text-sm">⚽</span>
                 <span className="text-[13px] sm:text-sm font-black tracking-wide" style={{ color: '#ff5a45' }}>
@@ -371,36 +371,35 @@ export default function Home() {
               <Image
                 src="/taes-title.png"
                 alt="TAES FC PREMIER"
-                width={1200}
-                height={858}
+                width={1178}
+                height={544}
                 priority
                 sizes="(max-width: 1024px) 84vw, 560px"
                 className="w-full h-auto mx-auto lg:mx-0"
                 style={{ maxWidth: 560, filter: 'drop-shadow(0 12px 30px rgba(0,0,0,0.7))' }}
               />
 
-              <p className="text-white/75 text-base sm:text-lg leading-relaxed mt-5">
+              <p className="text-white/75 text-base sm:text-lg leading-relaxed mt-3">
                 서툰 시작도 괜찮습니다.<br />
                 끝까지 해내는 아이로 자라는 과정,<br />
                 그것이 바로 태즈가 말하는 성장입니다.
               </p>
             </div>
 
-            {/* 우: 엠블럼 */}
-            <div className="flex-shrink-0">
+            {/* 우: 엠블럼 (외곽을 도는 불빛) */}
+            <div className="flex-shrink-0 emblem-wrap" style={{ width: 'min(56vw, 320px)' }}>
+              <div className="emblem-glow" aria-hidden />
               <Image
                 src="/taes-emblem.png"
                 alt="TAES FC 엠블럼"
-                width={1000}
-                height={1000}
+                width={983}
+                height={999}
                 priority
-                sizes="(max-width: 1024px) 62vw, 400px"
-                className="h-auto"
-                style={{
-                  width: 'min(62vw, 400px)',
-                  filter: 'drop-shadow(0 0 36px rgba(204,0,0,0.5)) drop-shadow(0 14px 32px rgba(0,0,0,0.7))',
-                }}
+                sizes="(max-width: 1024px) 56vw, 320px"
+                className="w-full h-auto relative"
+                style={{ filter: 'drop-shadow(0 0 30px rgba(204,0,0,0.45)) drop-shadow(0 12px 28px rgba(0,0,0,0.7))' }}
               />
+              <div className="emblem-shine" aria-hidden />
             </div>
 
           </div>
