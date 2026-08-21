@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import HeroAnimation from '@/components/HeroAnimation';
+import Image from 'next/image';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, orderBy, query, limit } from 'firebase/firestore';
 
@@ -336,31 +336,44 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* ─── HERO ─── */}
-      <section className="relative min-h-[600px] flex items-center overflow-hidden hero-gradient">
-        {/* 배경 격자 */}
-        <div className="absolute inset-0 opacity-5 pointer-events-none" style={{
-          backgroundImage: 'repeating-linear-gradient(45deg, #CC0000 0, #CC0000 1px, transparent 0, transparent 50%)',
-          backgroundSize: '20px 20px',
+      <section className="relative flex items-center overflow-hidden" style={{ minHeight: 560 }}>
+        {/* 배경 이미지 (선수) */}
+        <Image
+          src="/taes-hero-bg.jpg"
+          alt=""
+          aria-hidden
+          fill
+          priority
+          sizes="100vw"
+          style={{ objectFit: 'cover', objectPosition: 'center' }}
+        />
+        {/* 가독성 오버레이 */}
+        <div className="absolute inset-0 pointer-events-none" style={{
+          background: 'linear-gradient(90deg, rgba(5,5,5,0.82) 0%, rgba(5,5,5,0.45) 50%, rgba(5,5,5,0.25) 100%)',
+        }} />
+        <div className="absolute inset-x-0 bottom-0 h-32 pointer-events-none" style={{
+          background: 'linear-gradient(to top, #050505 0%, transparent 100%)',
         }} />
 
-        <div className="relative max-w-7xl mx-auto px-4 py-20 flex flex-col md:flex-row items-center gap-12">
-          <div className="flex-1 text-center md:text-left">
-            <div className="inline-flex items-center gap-2 bg-red-900/30 border border-red-800/50 text-red-400 text-xs font-bold px-3 py-1.5 rounded-full mb-6 tracking-wider">
-              ⚽ 2026 시즌 진행 중
-            </div>
-            <h1 className="text-5xl md:text-7xl font-black text-white leading-none mb-4 tracking-tight hero-text-glow">
-              TAES FC
-              <span className="block" style={{ color: '#CC0000' }}>PREMIER</span>
-            </h1>
-            <p className="text-white/60 text-lg mb-8 max-w-md">
+        <div className="relative w-full max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 py-14">
+          <div className="max-w-3xl">
+            {/* 타이틀 로고 (2026 시즌 배지 + TAES FC PREMIER + 엠블럼 일체형) */}
+            <Image
+              src="/taes-title.png"
+              alt="TAES FC PREMIER — 2026 시즌 진행 중"
+              width={1400}
+              height={682}
+              priority
+              sizes="(max-width: 768px) 88vw, 660px"
+              className="w-full h-auto"
+              style={{ maxWidth: 660, filter: 'drop-shadow(0 10px 28px rgba(0,0,0,0.6))' }}
+            />
+            <p className="text-white/75 text-base sm:text-lg mt-4 sm:mt-5 leading-relaxed">
               서툰 시작도 괜찮습니다.<br />
               끝까지 해내는 아이로 자라는 과정,<br />
               그것이 바로 태즈가 말하는 성장입니다.
             </p>
           </div>
-
-          {/* 킥 인트로 애니메이션 */}
-          <HeroAnimation />
         </div>
       </section>
 
