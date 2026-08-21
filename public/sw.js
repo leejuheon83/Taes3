@@ -1,5 +1,5 @@
 const CACHE_NAME = 'taes-fc-v1';
-const STATIC_ASSETS = ['/', '/manifest.json', '/taes-logo.png'];
+const STATIC_ASSETS = ['/', '/manifest.json', '/taes-emblem.png', '/taes-icon-192.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

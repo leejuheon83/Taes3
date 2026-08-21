@@ -10,7 +10,7 @@ export default function Footer() {
           {/* Club info */}
           <div className="md:col-span-2">
             <div className="flex items-center gap-3 mb-4">
-              <Image src="/taes-logo.png" alt="TAES FC" width={52} height={52} className="rounded-full opacity-90" />
+              <Image src="/taes-emblem.png" alt="TAES FC" width={52} height={52} className="rounded-full opacity-90" />
               <div>
                 <div className="font-black text-white text-2xl tracking-wider">TAES FC</div>
                 <div className="text-[#CC0000] text-xs font-bold tracking-widest">PREMIER</div>

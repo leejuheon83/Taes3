@@ -53,7 +53,7 @@ export default function SearchCard({ onClick }: SearchCardProps) {
 
         {/* TAES 로고 워터마크 */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/taes-logo.png" alt="" aria-hidden style={{ position:'absolute', top:'50%', left:'50%',
+        <img src="/taes-emblem.png" alt="" aria-hidden style={{ position:'absolute', top:'50%', left:'50%',
           transform:'translate(-50%,-52%)', width:'78%', pointerEvents:'none',
           opacity:0.15, filter:'grayscale(1) brightness(2) opacity(0.5)', zIndex:2 }}/>
 

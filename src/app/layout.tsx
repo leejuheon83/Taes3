@@ -8,8 +8,8 @@ export const metadata: Metadata = {
   description: "태즈 FC 프리미어반 공식 홈페이지. 공지사항, 경기일정, 사진 및 영상 갤러리, 학년별 선수등록.",
   manifest: '/manifest.json',
   icons: {
-    icon: '/taes-logo.png',
-    apple: '/taes-logo.png',
+    icon: '/taes-icon-192.png',
+    apple: '/taes-icon-192.png',
   },
   appleWebApp: {
     capable: true,

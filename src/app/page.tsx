@@ -55,7 +55,7 @@ function MiniStaffCard({ s }: { s: StaffCard }) {
           borderRadius:'12px 12px 0 0' }}/>
         {/* TAES 로고 워터마크 */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/taes-logo.png" alt="" aria-hidden style={{ position:'absolute', top:'50%', left:'50%',
+        <img src="/taes-emblem.png" alt="" aria-hidden style={{ position:'absolute', top:'50%', left:'50%',
           transform:'translate(-50%,-52%)', width:'78%', pointerEvents:'none',
           opacity:0.22, filter:'grayscale(1) brightness(2)', zIndex:2 }}/>
         {/* 상단 좌측: MANAGER 뱃지 */}
@@ -154,7 +154,7 @@ function MiniCard({ p }: { p: PlayerCard }) {
           borderRadius:'12px 12px 0 0' }}/>
         {/* TAES 로고 워터마크 */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/taes-logo.png" alt="" aria-hidden style={{ position:'absolute', top:'50%', left:'50%',
+        <img src="/taes-emblem.png" alt="" aria-hidden style={{ position:'absolute', top:'50%', left:'50%',
           transform:'translate(-50%,-52%)', width:'78%', pointerEvents:'none',
           opacity:0.22, filter:'grayscale(1) brightness(2)', zIndex:2 }}/>
         {/* 상단 좌측: OVR + 포지션 */}

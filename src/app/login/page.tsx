@@ -57,7 +57,7 @@ export default function LoginPage() {
         {/* 로고 */}
         <Link href="/" className="flex flex-col items-center gap-3 mb-10">
           <Image
-            src="/taes-logo.png"
+            src="/taes-emblem.png"
             alt="TAES FC"
             width={72}
             height={72}

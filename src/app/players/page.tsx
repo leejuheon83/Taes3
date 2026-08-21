@@ -48,7 +48,7 @@ async function generateCardCanvas(player: Player): Promise<HTMLCanvasElement> {
 
   // TAES 로고 워터마크
   try {
-    const logo = await loadImg('/taes-logo.png');
+    const logo = await loadImg('/taes-emblem.png');
     ctx.save(); ctx.globalAlpha = 0.18;
     const lsz = W * 0.78;
     ctx.drawImage(logo, (W - lsz)/2, H*0.5 - lsz*0.52, lsz, lsz);
@@ -358,7 +358,7 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
 
           {/* ── 로고 워터마크 ── */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/taes-logo.png" alt="" aria-hidden style={{
+          <img src="/taes-emblem.png" alt="" aria-hidden style={{
             position: 'absolute', top: '50%', left: '50%',
             transform: 'translate(-50%, -52%)',
             width: '78%', pointerEvents: 'none',
@@ -521,7 +521,7 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
               background: 'linear-gradient(128deg, rgba(255,255,255,0.08) 0%, transparent 40%)',
             }}/>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/taes-logo.png" alt="" aria-hidden style={{
+            <img src="/taes-emblem.png" alt="" aria-hidden style={{
               position: 'absolute', top: '50%', left: '50%',
               transform: 'translate(-50%, -50%)',
               width: '70%', pointerEvents: 'none',

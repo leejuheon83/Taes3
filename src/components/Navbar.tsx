@@ -102,7 +102,7 @@ export default function Navbar() {
                 }}
               />
               <Image
-                src="/taes-logo.png"
+                src="/taes-emblem.png"
                 alt="TAES FC"
                 width={48}
                 height={48}
