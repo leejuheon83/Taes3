@@ -349,7 +349,7 @@ export default function Home() {
         />
         {/* 가독성 오버레이 */}
         <div className="absolute inset-0 pointer-events-none" style={{
-          background: 'linear-gradient(90deg, rgba(4,4,4,0.72) 0%, rgba(4,4,4,0.40) 40%, rgba(4,4,4,0.18) 70%, rgba(4,4,4,0.38) 100%)',
+          background: 'linear-gradient(90deg, rgba(4,4,4,0.30) 0%, rgba(4,4,4,0.16) 38%, rgba(4,4,4,0.06) 70%, rgba(4,4,4,0.20) 100%)',
         }} />
         <div className="absolute inset-x-0 bottom-0 h-28 pointer-events-none" style={{
           background: 'linear-gradient(to top, #050505 0%, transparent 100%)',
