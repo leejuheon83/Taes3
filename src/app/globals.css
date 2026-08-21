@@ -130,42 +130,6 @@ body {
   overscroll-behavior: contain;
 }
 
-/* ── 히어로 타이틀 (금속 질감 + 이탤릭 기울기) ── */
-.hero-title {
-  font-weight: 900;
-  font-style: italic;
-  line-height: 0.86;
-  letter-spacing: -0.02em;
-  transform: skewX(-7deg);
-  transform-origin: left center;
-  margin: 0;
-}
-.hero-title-line {
-  display: block;
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  font-size: clamp(2.9rem, 9vw, 6.5rem);
-}
-.hero-title-white {
-  background-image: linear-gradient(180deg, #ffffff 0%, #f4f4f4 42%, #b4b4b4 78%, #8f8f8f 100%);
-  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.75));
-}
-.hero-title-red {
-  background-image: linear-gradient(180deg, #ff6252 0%, #ef1a08 40%, #c00000 76%, #8e0000 100%);
-  filter: drop-shadow(0 3px 12px rgba(180, 0, 0, 0.6));
-}
-/* 타이틀 아래 붉은 라인 */
-.hero-rule {
-  width: clamp(160px, 26vw, 300px);
-  height: 4px;
-  margin-top: 18px;
-  border-radius: 2px;
-  transform: skewX(-7deg);
-  background: linear-gradient(90deg, #ff3b25 0%, #cc0000 55%, rgba(204, 0, 0, 0) 100%);
-  box-shadow: 0 0 14px rgba(204, 0, 0, 0.55);
-}
-
 /* ── 섹션 헤더 공통 톤 (히어로와 같은 결) ── */
 .section-eyebrow {
   font-size: 11px;
