@@ -193,3 +193,52 @@ body {
   background: linear-gradient(90deg, #ff3b25 0%, #cc0000 100%);
   box-shadow: 0 0 10px rgba(204, 0, 0, 0.5);
 }
+
+/* ── 선수 카드 테두리를 도는 불빛 ── */
+.card-beam {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  padding: 2px;                /* 테두리 두께 */
+  border-radius: 14px;
+  pointer-events: none;
+  overflow: hidden;
+  /* 가운데를 잘라내 테두리 링만 남긴다 */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+.card-beam::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 240%;
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 236deg,
+    rgba(255, 74, 42, 0.35) 264deg,
+    #ff4a2a 288deg,
+    #fff2ec 300deg,
+    #ff4a2a 312deg,
+    rgba(255, 74, 42, 0.35) 336deg,
+    transparent 360deg
+  );
+  filter: drop-shadow(0 0 5px rgba(255, 90, 50, 0.9));
+  animation: card-beam-spin 3.8s linear infinite;
+}
+@keyframes card-beam-spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+/* 카드마다 시작 위치를 어긋나게 */
+.card-beam.d1::before { animation-delay: -0.7s; }
+.card-beam.d2::before { animation-delay: -1.4s; }
+.card-beam.d3::before { animation-delay: -2.1s; }
+.card-beam.d4::before { animation-delay: -2.8s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-beam::before { animation: none; }
+}

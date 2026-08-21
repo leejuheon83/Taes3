@@ -261,6 +261,8 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
     { k: 'DEF', v: player.stats.def }, { k: 'PHY', v: player.stats.phy },
   ];
   const uid = player.id;
+  // 카드마다 불빛 시작 위치를 어긋나게 (id 기반, 서버/클라이언트 동일)
+  const beamDelay = (String(player.id).split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 4) + 1;
   const wrapRef = useRef<HTMLDivElement>(null);
   const holoRef = useRef<HTMLDivElement>(null);
   const glareRef = useRef<HTMLDivElement>(null);
@@ -337,6 +339,9 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
             boxShadow: `0 2px 0 ${T.border}, 0 16px 56px rgba(0,0,0,0.97), 0 0 28px ${T.glow}1a, inset 0 1px 0 rgba(255,255,255,0.05)`,
           }}
         >
+          {/* ── 테두리를 도는 불빛 ── */}
+          <div className={`card-beam d${beamDelay}`} aria-hidden />
+
           {/* ── SVG: 카본 파이버 + 센터 글로우 ── */}
           <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
             <defs>
