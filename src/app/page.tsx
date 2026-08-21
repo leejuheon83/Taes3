@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, orderBy, query, limit } from 'firebase/firestore';
 
@@ -334,6 +335,78 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
+      {/* ─── HERO ─── */}
+      <section className="relative flex items-center overflow-hidden" style={{ minHeight: 620 }}>
+        {/* 배경 (축구하는 아이들) */}
+        <Image
+          src="/taes-hero-bg.jpg"
+          alt=""
+          aria-hidden
+          fill
+          priority
+          sizes="100vw"
+          style={{ objectFit: 'cover', objectPosition: 'center' }}
+        />
+        {/* 가독성 오버레이 (은은하게) */}
+        <div className="absolute inset-0 pointer-events-none" style={{
+          background: 'linear-gradient(90deg, rgba(4,4,4,0.50) 0%, rgba(4,4,4,0.26) 42%, rgba(4,4,4,0.08) 72%, rgba(4,4,4,0.26) 100%)',
+        }} />
+        <div className="absolute inset-x-0 bottom-0 h-28 pointer-events-none" style={{
+          background: 'linear-gradient(to top, #050505 0%, transparent 100%)',
+        }} />
+
+        <div className="relative w-full max-w-7xl mx-auto px-6 sm:px-10 lg:px-14 py-16">
+          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-8">
+
+            {/* 좌: 타이틀 로고 + 문구 */}
+            <div className="flex-1 min-w-0 text-center lg:text-left">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-5"
+                style={{ background: 'rgba(140,0,0,0.38)', border: '1px solid rgba(255,60,40,0.55)' }}>
+                <span className="text-sm">⚽</span>
+                <span className="text-[13px] sm:text-sm font-black tracking-wide" style={{ color: '#ff5a45' }}>
+                  2026 시즌 진행 중
+                </span>
+              </div>
+
+              <Image
+                src="/taes-title.png"
+                alt="TAES FC PREMIER"
+                width={1200}
+                height={858}
+                priority
+                sizes="(max-width: 1024px) 84vw, 560px"
+                className="w-full h-auto mx-auto lg:mx-0"
+                style={{ maxWidth: 560, filter: 'drop-shadow(0 12px 30px rgba(0,0,0,0.7))' }}
+              />
+
+              <p className="text-white/75 text-base sm:text-lg leading-relaxed mt-5">
+                서툰 시작도 괜찮습니다.<br />
+                끝까지 해내는 아이로 자라는 과정,<br />
+                그것이 바로 태즈가 말하는 성장입니다.
+              </p>
+            </div>
+
+            {/* 우: 엠블럼 */}
+            <div className="flex-shrink-0">
+              <Image
+                src="/taes-emblem.png"
+                alt="TAES FC 엠블럼"
+                width={1000}
+                height={1000}
+                priority
+                sizes="(max-width: 1024px) 62vw, 400px"
+                className="h-auto"
+                style={{
+                  width: 'min(62vw, 400px)',
+                  filter: 'drop-shadow(0 0 36px rgba(204,0,0,0.5)) drop-shadow(0 14px 32px rgba(0,0,0,0.7))',
+                }}
+              />
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       {/* ─── 태즈의 순간들 ─── */}
       <section style={{ backgroundColor: '#080808', borderTop: '2px solid #CC0000' }}>
         <div className="max-w-7xl mx-auto px-4 py-14">
