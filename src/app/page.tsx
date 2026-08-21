@@ -360,7 +360,8 @@ export default function Home() {
 
             {/* 좌: 타이틀 로고 + 문구 */}
             <div className="flex-1 min-w-0 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-3"
+              <div className="mx-auto lg:mx-0" style={{ maxWidth: 560 }}>
+              <div className="badge-align inline-flex items-center gap-2 px-4 py-2 rounded-full mb-3"
                 style={{ background: 'rgba(140,0,0,0.38)', border: '1px solid rgba(255,60,40,0.55)' }}>
                 <span className="text-sm">⚽</span>
                 <span className="text-[13px] sm:text-sm font-black tracking-wide" style={{ color: '#ff5a45' }}>
@@ -384,10 +385,11 @@ export default function Home() {
                 끝까지 해내는 아이로 자라는 과정,<br />
                 그것이 바로 태즈가 말하는 성장입니다.
               </p>
+              </div>
             </div>
 
             {/* 우: 엠블럼 (외곽을 도는 불빛) */}
-            <div className="flex-shrink-0 emblem-wrap" style={{ width: 'min(56vw, 320px)' }}>
+            <div className="flex-shrink-0 emblem-wrap" style={{ width: 'min(58vw, 370px)' }}>
               <div className="emblem-glow" aria-hidden />
               <Image
                 src="/taes-emblem.png"
@@ -395,7 +397,7 @@ export default function Home() {
                 width={983}
                 height={999}
                 priority
-                sizes="(max-width: 1024px) 56vw, 320px"
+                sizes="(max-width: 1024px) 58vw, 370px"
                 className="w-full h-auto relative"
                 style={{ filter: 'drop-shadow(0 0 30px rgba(204,0,0,0.45)) drop-shadow(0 12px 28px rgba(0,0,0,0.7))' }}
               />
