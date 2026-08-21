@@ -339,7 +339,7 @@ export default function Home() {
       <section className="relative flex items-center overflow-hidden" style={{ minHeight: 620 }}>
         {/* 배경 이미지 (선수) */}
         <Image
-          src="/taes-hero-bg-kids.jpg"
+          src="/taes-hero-bg.jpg"
           alt=""
           aria-hidden
           fill
@@ -349,7 +349,7 @@ export default function Home() {
         />
         {/* 가독성 오버레이 */}
         <div className="absolute inset-0 pointer-events-none" style={{
-          background: 'linear-gradient(90deg, rgba(4,4,4,0.90) 0%, rgba(4,4,4,0.62) 42%, rgba(4,4,4,0.30) 72%, rgba(4,4,4,0.45) 100%)',
+          background: 'linear-gradient(90deg, rgba(4,4,4,0.72) 0%, rgba(4,4,4,0.40) 40%, rgba(4,4,4,0.18) 70%, rgba(4,4,4,0.38) 100%)',
         }} />
         <div className="absolute inset-x-0 bottom-0 h-28 pointer-events-none" style={{
           background: 'linear-gradient(to top, #050505 0%, transparent 100%)',
