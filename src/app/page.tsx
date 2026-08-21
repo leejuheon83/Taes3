@@ -336,7 +336,7 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* ─── HERO ─── */}
-      <section className="relative flex items-center overflow-hidden" style={{ minHeight: 560 }}>
+      <section className="relative flex items-center overflow-hidden" style={{ minHeight: 620 }}>
         {/* 배경 이미지 (선수) */}
         <Image
           src="/taes-hero-bg.jpg"
@@ -349,30 +349,57 @@ export default function Home() {
         />
         {/* 가독성 오버레이 */}
         <div className="absolute inset-0 pointer-events-none" style={{
-          background: 'linear-gradient(90deg, rgba(5,5,5,0.82) 0%, rgba(5,5,5,0.45) 50%, rgba(5,5,5,0.25) 100%)',
+          background: 'linear-gradient(90deg, rgba(4,4,4,0.90) 0%, rgba(4,4,4,0.62) 42%, rgba(4,4,4,0.30) 72%, rgba(4,4,4,0.45) 100%)',
         }} />
-        <div className="absolute inset-x-0 bottom-0 h-32 pointer-events-none" style={{
+        <div className="absolute inset-x-0 bottom-0 h-28 pointer-events-none" style={{
           background: 'linear-gradient(to top, #050505 0%, transparent 100%)',
         }} />
 
-        <div className="relative w-full max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 py-14">
-          <div className="max-w-3xl">
-            {/* 타이틀 로고 (2026 시즌 배지 + TAES FC PREMIER + 엠블럼 일체형) */}
-            <Image
-              src="/taes-title.png"
-              alt="TAES FC PREMIER — 2026 시즌 진행 중"
-              width={1400}
-              height={682}
-              priority
-              sizes="(max-width: 768px) 88vw, 660px"
-              className="w-full h-auto"
-              style={{ maxWidth: 660, filter: 'drop-shadow(0 10px 28px rgba(0,0,0,0.6))' }}
-            />
-            <p className="text-white/75 text-base sm:text-lg mt-4 sm:mt-5 leading-relaxed">
-              서툰 시작도 괜찮습니다.<br />
-              끝까지 해내는 아이로 자라는 과정,<br />
-              그것이 바로 태즈가 말하는 성장입니다.
-            </p>
+        <div className="relative w-full max-w-7xl mx-auto px-6 sm:px-10 lg:px-14 py-16">
+          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-6">
+
+            {/* 좌: 배지 + 타이틀 + 문구 */}
+            <div className="flex-1 min-w-0 text-center lg:text-left">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6"
+                style={{ background: 'rgba(140,0,0,0.35)', border: '1px solid rgba(255,60,40,0.55)',
+                         boxShadow: '0 0 20px rgba(204,0,0,0.25) inset' }}>
+                <span className="text-sm">⚽</span>
+                <span className="text-[13px] sm:text-sm font-black tracking-wide" style={{ color: '#ff5a45' }}>
+                  2026 시즌 진행 중
+                </span>
+              </div>
+
+              <h1 className="hero-title">
+                <span className="hero-title-line hero-title-white">TAES FC</span>
+                <span className="hero-title-line hero-title-red">PREMIER</span>
+              </h1>
+
+              <div className="hero-rule mx-auto lg:mx-0" />
+
+              <p className="text-white/75 text-base sm:text-lg leading-relaxed mt-5">
+                서툰 시작도 괜찮습니다.<br />
+                끝까지 해내는 아이로 자라는 과정,<br />
+                그것이 바로 태즈가 말하는 성장입니다.
+              </p>
+            </div>
+
+            {/* 우: 엠블럼 */}
+            <div className="flex-shrink-0">
+              <Image
+                src="/taes-emblem.png"
+                alt="TAES FC 엠블럼"
+                width={985}
+                height={1000}
+                priority
+                sizes="(max-width: 1024px) 60vw, 420px"
+                className="h-auto"
+                style={{
+                  width: 'min(60vw, 420px)',
+                  filter: 'drop-shadow(0 0 34px rgba(204,0,0,0.55)) drop-shadow(0 14px 30px rgba(0,0,0,0.65))',
+                }}
+              />
+            </div>
+
           </div>
         </div>
       </section>
@@ -385,9 +412,9 @@ export default function Home() {
           {/* 섹션 헤더 */}
           <div className="flex items-end justify-between mb-8">
             <div>
-              <div className="text-xs font-black tracking-widest mb-2" style={{ color: '#CC0000' }}>OUR TEAM</div>
-              <h2 className="text-3xl font-black text-white leading-none">태즈의 순간들</h2>
-              <div className="mt-2 h-0.5 w-12" style={{ backgroundColor: '#CC0000' }} />
+              <div className="section-eyebrow mb-2">OUR TEAM</div>
+              <h2 className="text-3xl section-title leading-none">태즈의 순간들</h2>
+              <div className="section-rule mt-2" />
             </div>
           </div>
 
@@ -501,9 +528,9 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 py-10">
             <div className="flex items-end justify-between mb-6">
               <div>
-                <div className="text-xs font-black tracking-widest mb-2" style={{ color: '#CC0000' }}>OUR SQUAD</div>
-                <h2 className="text-3xl font-black text-white leading-none">선수단</h2>
-                <div className="mt-2 h-0.5 w-12" style={{ backgroundColor: '#CC0000' }} />
+                <div className="section-eyebrow mb-2">OUR SQUAD</div>
+                <h2 className="text-3xl section-title leading-none">선수단</h2>
+                <div className="section-rule mt-2" />
               </div>
               <Link href="/players" className="text-sm font-bold tracking-wider hover:text-red-500 transition-colors" style={{ color: 'rgba(255,255,255,0.3)' }}>
                 전체보기 →
@@ -528,7 +555,7 @@ export default function Home() {
             <div>
               <div className="flex items-end justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-black text-white">공지사항</h2>
+                  <h2 className="text-2xl section-title">공지사항</h2>
                   <div className="section-divider mt-2" />
                 </div>
                 <Link href="/notice" className="text-sm text-white/50 hover:text-red-500 transition-colors">전체보기 →</Link>
@@ -562,7 +589,7 @@ export default function Home() {
             <div>
               <div className="flex items-end justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-black text-white">경기 일정</h2>
+                  <h2 className="text-2xl section-title">경기 일정</h2>
                   <div className="section-divider mt-2" />
                 </div>
                 <Link href="/schedule" className="text-sm text-white/50 hover:text-red-500 transition-colors">전체보기 →</Link>
@@ -620,7 +647,7 @@ export default function Home() {
             {/* Next match */}
             <div>
               <div className="mb-6">
-                <h2 className="text-2xl font-black text-white">다음 경기</h2>
+                <h2 className="text-2xl section-title">다음 경기</h2>
                 <div className="section-divider mt-2" />
               </div>
               {nextMatch ? (
@@ -663,7 +690,7 @@ export default function Home() {
             <div>
               <div className="flex items-end justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-black text-white">사진 갤러리</h2>
+                  <h2 className="text-2xl section-title">사진 갤러리</h2>
                   <div className="section-divider mt-2" />
                 </div>
                 <Link href="/gallery" className="text-sm text-white/50 hover:text-red-500 transition-colors">더보기 →</Link>

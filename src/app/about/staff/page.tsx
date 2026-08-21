@@ -335,8 +335,8 @@ export default function StaffPage() {
       <div className="py-16 px-4" style={{ background: 'linear-gradient(135deg, #050505 0%, #1a0000 100%)' }}>
         <div className="max-w-6xl mx-auto flex items-end justify-between">
           <div>
-            <div className="text-xs font-bold tracking-widest mb-2" style={{ color: '#CC0000' }}>COACHING STAFF</div>
-            <h1 className="text-4xl font-black text-white mb-2">코칭 스태프</h1>
+            <div className="section-eyebrow mb-2">COACHING STAFF</div>
+            <h1 className="text-4xl section-title mb-2">코칭 스태프</h1>
             <p className="text-white/40 text-sm">TAES FC PREMIER 코치진을 소개합니다</p>
           </div>
           <button onClick={openAdd}
@@ -382,7 +382,7 @@ export default function StaffPage() {
           onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
           <div className="w-full max-w-md border border-white/10 overflow-y-auto max-h-[90vh]" style={{ backgroundColor: '#0a0a0a' }}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-              <h2 className="font-black text-white text-lg">{editTarget ? '스태프 수정' : '스태프 등록'}</h2>
+              <h2 className="section-title text-lg">{editTarget ? '스태프 수정' : '스태프 등록'}</h2>
               <button onClick={() => setShowForm(false)} className="text-white/40 hover:text-white text-2xl">×</button>
             </div>
 

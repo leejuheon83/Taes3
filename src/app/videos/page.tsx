@@ -228,8 +228,8 @@ export default function VideosPage() {
       {/* Header */}
       <div className="py-16 px-4" style={{ background: 'linear-gradient(135deg, #050505 0%, #1a0000 100%)' }}>
         <div className="max-w-6xl mx-auto">
-          <div className="text-xs font-bold tracking-widest mb-2" style={{ color: '#CC0000' }}>VIDEOS</div>
-          <h1 className="text-4xl font-black text-white mb-2">경기/훈련 영상</h1>
+          <div className="section-eyebrow mb-2">VIDEOS</div>
+          <h1 className="text-4xl section-title mb-2">경기/훈련 영상</h1>
           <p className="text-white/40 text-sm">경기 하이라이트 및 훈련 영상을 공유해 주세요.</p>
         </div>
       </div>
@@ -392,7 +392,7 @@ export default function VideosPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.88)' }}>
           <div className="w-full max-w-lg p-6 border border-white/10 overflow-y-auto max-h-[90vh]" style={{ backgroundColor: '#080808' }}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-black text-white">영상 등록</h2>
+              <h2 className="text-lg section-title">영상 등록</h2>
               <button onClick={() => { setShowUpload(false); setVideoFile(null); }} className="text-white/40 hover:text-white text-xl">✕</button>
             </div>
 

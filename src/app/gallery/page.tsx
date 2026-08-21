@@ -400,8 +400,8 @@ export default function GalleryPage() {
     <div className="min-h-screen">
       <div className="py-16 px-4" style={{ background: 'linear-gradient(135deg, #050505 0%, #1a0000 100%)' }}>
         <div className="max-w-6xl mx-auto">
-          <div className="text-xs font-bold tracking-widest mb-2" style={{ color: '#CC0000' }}>GALLERY</div>
-          <h1 className="text-4xl font-black text-white mb-2">사진 갤러리</h1>
+          <div className="section-eyebrow mb-2">GALLERY</div>
+          <h1 className="text-4xl section-title mb-2">사진 갤러리</h1>
           <p className="text-white/40 text-sm">TAES FC 프리미어의 생생한 경기 & 훈련 현장을 담았습니다.</p>
         </div>
       </div>
@@ -662,7 +662,7 @@ export default function GalleryPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
           <div className="w-full max-w-md p-6 border border-white/10" style={{ backgroundColor: '#080808' }}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-black text-white">새 앨범 만들기</h2>
+              <h2 className="text-lg section-title">새 앨범 만들기</h2>
               <button onClick={() => setShowNewAlbum(false)} className="text-white/40 hover:text-white text-xl">✕</button>
             </div>
             <div className="space-y-4">
@@ -703,7 +703,7 @@ export default function GalleryPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
           <div className="w-full max-w-lg p-6 border border-white/10" style={{ backgroundColor: '#080808' }}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-black text-white">사진 업로드</h2>
+              <h2 className="text-lg section-title">사진 업로드</h2>
               <button onClick={() => { setShowUpload(false); setUploadPreviews([]); }} className="text-white/40 hover:text-white text-xl">✕</button>
             </div>
 

@@ -203,8 +203,8 @@ export default function SchedulePage() {
       <div className="py-16 px-4" style={{ background: 'linear-gradient(135deg, #050505 0%, #1a0000 100%)' }}>
         <div className="max-w-6xl mx-auto flex items-end justify-between">
           <div>
-            <div className="text-xs font-bold tracking-widest mb-2" style={{ color: '#CC0000' }}>SCHEDULE</div>
-            <h1 className="text-4xl font-black text-white mb-2">경기 일정 · 결과</h1>
+            <div className="section-eyebrow mb-2">SCHEDULE</div>
+            <h1 className="text-4xl section-title mb-2">경기 일정 · 결과</h1>
             <p className="text-white/40 text-sm">2025 시즌 경기 일정 및 결과입니다.</p>
           </div>
           <div className="flex items-center gap-3">
@@ -388,7 +388,7 @@ export default function SchedulePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
           <div className="w-full max-w-lg border border-white/10 overflow-y-auto max-h-[90vh]" style={{ backgroundColor: '#080808' }}>
             <div className="flex items-center justify-between p-6 border-b border-white/10">
-              <h2 className="text-lg font-black text-white">{editId !== null ? '경기 수정' : '경기 등록'}</h2>
+              <h2 className="text-lg section-title">{editId !== null ? '경기 수정' : '경기 등록'}</h2>
               <button onClick={() => setShowModal(false)} className="text-white/40 hover:text-white text-2xl leading-none">×</button>
             </div>
 

@@ -77,12 +77,17 @@ export default function Navbar() {
       }`}
     >
       {/* Top bar */}
-      <div className="bg-[#CC0000] py-1 px-4">
-        <div className="max-w-7xl mx-auto flex justify-center items-center gap-3 text-xs">
-          <span className="font-black text-white tracking-widest">⚽ TAES FC PREMIER</span>
-          <span className="text-white/40">|</span>
-          <span className="font-bold text-yellow-300 flex items-center gap-1">
-            <span className="inline-block animate-pulse">❤️</span> 엄마,아빠가 응원합니다.
+      <div className="py-1.5 px-4" style={{
+        background: 'linear-gradient(90deg, #7a0000 0%, #cc0000 22%, #e11400 50%, #cc0000 78%, #7a0000 100%)',
+        borderBottom: '1px solid rgba(0,0,0,0.55)',
+      }}>
+        <div className="max-w-7xl mx-auto flex justify-center items-center gap-2 sm:gap-3 text-[11px] sm:text-xs">
+          <span className="font-black text-white tracking-widest whitespace-nowrap"
+            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.45)' }}>⚽ TAES FC PREMIER</span>
+          <span className="text-white/35">|</span>
+          <span className="font-bold flex items-center gap-1 whitespace-nowrap"
+            style={{ color: '#ffd76a', textShadow: '0 1px 2px rgba(0,0,0,0.45)' }}>
+            <span className="inline-block animate-pulse">❤️</span> 엄마, 아빠가 응원합니다.
           </span>
         </div>
       </div>

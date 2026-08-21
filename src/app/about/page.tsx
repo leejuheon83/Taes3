@@ -57,8 +57,8 @@ export default function AboutPage() {
     <div className="min-h-screen">
       <div className="py-16 px-4" style={{ background: 'linear-gradient(135deg, #0a0a0a 0%, #1a0000 100%)' }}>
         <div className="max-w-4xl mx-auto">
-          <div className="text-xs font-bold tracking-widest mb-2" style={{ color: '#CC0000' }}>ABOUT</div>
-          <h1 className="text-4xl font-black text-white mb-2">클럽 소개</h1>
+          <div className="section-eyebrow mb-2">ABOUT</div>
+          <h1 className="text-4xl section-title mb-2">클럽 소개</h1>
           <p className="text-white/40 text-sm">{info.slogan}</p>
         </div>
       </div>
@@ -78,7 +78,7 @@ export default function AboutPage() {
 
             {/* 소개 */}
             <div className="mb-10">
-              <h2 className="text-xl font-black text-white mb-1">클럽 소개</h2>
+              <h2 className="text-xl section-title mb-1">클럽 소개</h2>
               <div className="section-divider mb-5" />
               <div className="text-white/70 text-sm leading-relaxed whitespace-pre-wrap border border-white/10 p-6" style={{ backgroundColor: '#111' }}>
                 {info.intro}
@@ -87,7 +87,7 @@ export default function AboutPage() {
 
             {/* 클럽 철학 */}
             <div className="mb-10">
-              <h2 className="text-xl font-black text-white mb-1">클럽 철학</h2>
+              <h2 className="text-xl section-title mb-1">클럽 철학</h2>
               <div className="section-divider mb-5" />
               <div className="text-white/70 text-sm leading-relaxed whitespace-pre-wrap border border-white/10 p-6" style={{ backgroundColor: '#111' }}>
                 {info.philosophy}
@@ -114,7 +114,7 @@ export default function AboutPage() {
         ) : (
           /* 수정 폼 */
           <div className="border border-white/10 p-6" style={{ backgroundColor: '#111' }}>
-            <h2 className="text-lg font-black text-white mb-6">클럽 정보 수정</h2>
+            <h2 className="text-lg section-title mb-6">클럽 정보 수정</h2>
             <div className="space-y-4">
               {([
                 { key: 'name', label: '클럽명' },

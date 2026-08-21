@@ -823,8 +823,8 @@ function PlayersContent() {
       <div className="py-16 px-4" style={{ background: 'linear-gradient(135deg, #050505 0%, #1a0000 100%)' }}>
         <div className="max-w-7xl mx-auto flex items-end justify-between">
           <div>
-            <div className="text-xs font-bold tracking-widest mb-2" style={{ color: '#CC0000' }}>PLAYERS</div>
-            <h1 className="text-4xl font-black text-white mb-2">등록 선수</h1>
+            <div className="section-eyebrow mb-2">PLAYERS</div>
+            <h1 className="text-4xl section-title mb-2">등록 선수</h1>
             <p className="text-white/40 text-sm">카드를 클릭하면 수정·삭제할 수 있습니다 ⚽</p>
           </div>
           <button onClick={openAdd}
@@ -892,7 +892,7 @@ function PlayersContent() {
 
             {/* 헤더 */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-              <h2 className="font-black text-white text-lg">
+              <h2 className="section-title text-lg">
                 {addMode ? '선수 등록' : showForm ? '선수 수정' : selected?.name}
               </h2>
               <div className="flex items-center gap-2">
