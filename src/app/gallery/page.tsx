@@ -76,7 +76,10 @@ export default function GalleryPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [view, setView] = useState<'albums' | 'all'>('albums');
-  const [openAlbum, setOpenAlbum] = useState<Album | null>(null);
+  const [openAlbumId, setOpenAlbumId] = useState<string | null>(null);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+  // 사진을 이미 내려받은 앨범 (렌더와 무관한 기록이라 ref 사용)
+  const loadedAlbumsRef = useRef<Set<string>>(new Set());
   const [featuredPhotoId, setFeaturedPhotoId] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -138,22 +141,18 @@ export default function GalleryPage() {
       const loaded: Album[] = [];
       for (const d of snap.docs) {
         const albumData = d.data() as Omit<Album, 'id'>;
-        let items = albumData.items ?? [];
-        try {
-          // base64 사진은 photos 하위 컬렉션에서 불러와 합친다
-          const photosSnap = await getDocs(collection(db, 'albums', d.id, 'photos'));
-          if (!photosSnap.empty) {
-            const dataMap = new Map(
-              photosSnap.docs.map(p => [p.id, (p.data() as { data?: string }).data])
-            );
-            items = items.map(it => {
-              const data = dataMap.get(it.id);
-              return data ? { ...it, url: data } : it;
-            });
-          }
-        } catch { /* 하위 컬렉션이 없으면 기존 url 그대로 사용 */ }
+        const items = [...(albumData.items ?? [])];
+        // 목록에서는 커버 1장만 필요하다. 나머지는 앨범을 열 때 불러온다.
+        if (items.length) {
+          try {
+            const cover = await getDoc(doc(db, 'albums', d.id, 'photos', items[0].id));
+            const data = cover.exists() ? (cover.data() as { data?: string }).data : undefined;
+            if (data) items[0] = { ...items[0], url: data };
+          } catch { /* 커버가 없으면 그대로 둔다 */ }
+        }
         loaded.push({ id: d.id, ...albumData, items });
       }
+      loadedAlbumsRef.current = new Set();
       setAlbums(loaded);
 
       // Load featured photo id from settings
@@ -167,6 +166,44 @@ export default function GalleryPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // 앨범 하나의 사진 전체를 필요할 때만 내려받는다
+  async function ensureAlbumPhotos(albumId: string) {
+    if (loadedAlbumsRef.current.has(albumId)) return;
+    try {
+      const photosSnap = await getDocs(collection(db, 'albums', albumId, 'photos'));
+      const dataMap = new Map(
+        photosSnap.docs.map(ph => [ph.id, (ph.data() as { data?: string }).data])
+      );
+      setAlbums(prev => prev.map(a => a.id !== albumId ? a : {
+        ...a,
+        items: a.items.map(it => {
+          const data = dataMap.get(it.id);
+          return data ? { ...it, url: data } : it;
+        }),
+      }));
+      loadedAlbumsRef.current.add(albumId);
+    } catch (err) {
+      console.error('Failed to load album photos:', err);
+    }
+  }
+
+  async function handleOpenAlbum(album: Album) {
+    setOpenAlbumId(album.id);
+    if (loadedAlbumsRef.current.has(album.id)) return;
+    setLoadingPhotos(true);
+    try { await ensureAlbumPhotos(album.id); }
+    finally { setLoadingPhotos(false); }
+  }
+
+  async function handleShowAll() {
+    setView('all');
+    const pending = albums.filter(a => !loadedAlbumsRef.current.has(a.id));
+    if (!pending.length) return;
+    setLoadingPhotos(true);
+    try { for (const a of pending) await ensureAlbumPhotos(a.id); }
+    finally { setLoadingPhotos(false); }
   }
 
   if (!authChecked) return null;
@@ -204,7 +241,8 @@ export default function GalleryPage() {
       }
       await deleteDoc(doc(db, 'albums', id));
       setAlbums(prev => prev.filter(a => a.id !== id));
-      if (openAlbum?.id === id) setOpenAlbum(null);
+      loadedAlbumsRef.current.delete(id);
+      if (openAlbumId === id) setOpenAlbumId(null);
     } catch (err) {
       console.error('Failed to delete album:', err);
       alert('앨범 삭제에 실패했습니다.');
@@ -248,11 +286,9 @@ export default function GalleryPage() {
 
       const updatedItems = [...album.items, ...newItems];
       await updateDoc(doc(db, 'albums', uploadAlbumId), { items: toItemMeta(updatedItems) });
+      loadedAlbumsRef.current.add(uploadAlbumId);
 
       setAlbums(prev => prev.map(a => a.id === uploadAlbumId ? { ...a, items: updatedItems } : a));
-      if (openAlbum?.id === uploadAlbumId) {
-        setOpenAlbum(prev => prev ? { ...prev, items: updatedItems } : null);
-      }
     } catch (err) {
       console.error('Upload failed:', err);
       alert('업로드에 실패했습니다.');
@@ -277,9 +313,6 @@ export default function GalleryPage() {
       const updatedItems = album.items.filter(p => p.id !== itemId);
       await updateDoc(doc(db, 'albums', albumId), { items: toItemMeta(updatedItems) });
       setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, items: updatedItems } : a));
-      if (openAlbum?.id === albumId) {
-        setOpenAlbum(prev => prev ? { ...prev, items: updatedItems } : null);
-      }
     } catch (err) {
       console.error('Failed to delete item:', err);
       alert('삭제에 실패했습니다.');
@@ -383,7 +416,6 @@ export default function GalleryPage() {
       const updatedItems = [...openAlbum.items, ...newItems];
       await updateDoc(doc(db, 'albums', openAlbum.id), { items: toItemMeta(updatedItems) });
       setAlbums(prev => prev.map(a => a.id === openAlbum.id ? { ...a, items: updatedItems } : a));
-      setOpenAlbum(prev => prev ? { ...prev, items: updatedItems } : null);
     } catch (err) {
       console.error('Upload failed:', err);
       alert('업로드에 실패했습니다.');
@@ -393,6 +425,7 @@ export default function GalleryPage() {
     }
   }
 
+  const openAlbum = albums.find(a => a.id === openAlbumId) ?? null;
   const filteredAlbums = albums;
   const allItems = albums.flatMap(a => a.items.map(p => ({ ...p, albumId: a.id })));
 
@@ -408,11 +441,11 @@ export default function GalleryPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-10">
 
-        {(uploading || migrating) && (
+        {(uploading || migrating || loadingPhotos) && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}>
             <div className="text-white text-center px-8 py-6 rounded-xl" style={{ backgroundColor: '#111' }}>
               <div className="text-3xl mb-3" style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>☁️</div>
-              <div className="font-bold text-lg mb-1">{migrating ? '예전 사진 복구 중...' : '업로드 중...'}</div>
+              <div className="font-bold text-lg mb-1">{migrating ? '예전 사진 복구 중...' : loadingPhotos ? '사진 불러오는 중...' : '업로드 중...'}</div>
               {(uploadProgress ?? migrateProgress) && (
                 <>
                   <div className="text-white/50 text-sm mb-3">{(uploadProgress ?? migrateProgress)!.current} / {(uploadProgress ?? migrateProgress)!.total} 장</div>
@@ -429,7 +462,7 @@ export default function GalleryPage() {
         {openAlbum ? (
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-6">
-              <button onClick={() => setOpenAlbum(null)} className="text-sm text-white/50 hover:text-white transition-colors text-left">
+              <button onClick={() => setOpenAlbumId(null)} className="text-sm text-white/50 hover:text-white transition-colors text-left">
                 ← 앨범 목록
               </button>
               <div className="text-white/20 hidden sm:block">|</div>
@@ -523,7 +556,7 @@ export default function GalleryPage() {
                   앨범
                 </button>
                 <button
-                  onClick={() => setView('all')}
+                  onClick={handleShowAll}
                   className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 sm:py-2 text-sm font-bold transition-colors touch-manipulation"
                   style={{ backgroundColor: view === 'all' ? '#CC0000' : '#080808', color: view === 'all' ? '#fff' : 'rgba(255,255,255,0.5)' }}
                 >
@@ -562,7 +595,7 @@ export default function GalleryPage() {
                 {filteredAlbums.map(album => (
                   <div key={album.id} className="relative group">
                     <button
-                      onClick={() => setOpenAlbum(album)}
+                      onClick={() => handleOpenAlbum(album)}
                       className="w-full text-left border border-white/10 hover:border-red-800/50 transition-all card-hover"
                       style={{ backgroundColor: '#080808' }}
                     >

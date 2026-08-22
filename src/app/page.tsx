@@ -277,23 +277,18 @@ export default function Home() {
         // Load latest gallery photos (최대 6장)
         const albumSnap = await getDocs(query(collection(db, 'albums'), orderBy('date', 'desc')));
         const photos: string[] = [];
-        // 사진 본문은 albums/{id}/photos 하위 문서에 base64로 저장되어 있다
+        // 사진 본문은 albums/{id}/photos 하위 문서에 base64로 저장되어 있다.
+        // 앨범당 필요한 만큼만 받아 전송량을 줄인다.
         for (const albumDoc of albumSnap.docs) {
-          const photoSnap = await getDocs(collection(db, 'albums', albumDoc.id, 'photos'));
+          const need = 6 - photos.length;
+          if (need <= 0) break;
+          const photoSnap = await getDocs(
+            query(collection(db, 'albums', albumDoc.id, 'photos'), limit(need))
+          );
           for (const ph of photoSnap.docs) {
             const data = (ph.data() as { data?: string }).data;
-            if (data) { photos.push(data); if (photos.length >= 6) break; }
+            if (data) photos.push(data);
           }
-          if (photos.length >= 6) break;
-        }
-        for (const albumDoc of albumSnap.docs) {
-          const items = albumDoc.data().items as { url: string }[] | undefined;
-          if (items) {
-            for (const item of items) {
-              if (item.url) { photos.push(item.url); if (photos.length >= 6) break; }
-            }
-          }
-          if (photos.length >= 6) break;
         }
         setGalleryPhotos(photos);
       } catch { /* ignore */ }
