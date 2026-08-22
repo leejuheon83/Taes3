@@ -205,6 +205,17 @@ function MiniCard({ p }: { p: PlayerCard }) {
 }
 
 
+// 오늘부터 경기일까지 남은 일수 (자정 기준)
+function daysUntil(dateStr: string): number | null {
+  if (!dateStr) return null;
+  const target = new Date(dateStr);
+  if (isNaN(target.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
 type MatchItem = {
   id: string;
   date: string;
@@ -412,6 +423,34 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ─── 다음 경기 D-day ─── */}
+      {nextMatch && (() => {
+        const d = daysUntil(nextMatch.date);
+        if (d === null || d < 0) return null;
+        const label = d === 0 ? 'TODAY' : `D-${d}`;
+        return (
+          <Link href="/schedule" className="block group">
+            <div className="border-y" style={{
+              borderColor: 'rgba(204,0,0,0.35)',
+              background: 'linear-gradient(90deg, rgba(60,0,0,0.9) 0%, rgba(20,0,0,0.9) 55%, rgba(60,0,0,0.9) 100%)',
+            }}>
+              <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-center">
+                <span className="dday-chip">{label}</span>
+                <span className="text-white/45 text-xs font-bold tracking-widest">다음 경기</span>
+                <span className="text-white font-black text-sm sm:text-base">
+                  {nextMatch.home} <span style={{ color: '#ff3b25' }}>vs</span> {nextMatch.away}
+                </span>
+                <span className="text-white/45 text-xs">
+                  {nextMatch.date.replace(/-/g, '.')} {nextMatch.day && `(${nextMatch.day})`} {nextMatch.time}
+                  {nextMatch.venue && ` · 📍 ${nextMatch.venue}`}
+                </span>
+                <span className="text-white/30 text-xs group-hover:text-white/60 transition-colors">일정 보기 →</span>
+              </div>
+            </div>
+          </Link>
+        );
+      })()}
 
       {/* ─── 태즈의 순간들 ─── */}
       <section style={{ backgroundColor: '#080808', borderTop: '2px solid #CC0000' }}>

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { useRouter } from 'next/navigation';
+import { SkeletonGrid } from '@/components/Skeleton';
 import { db } from '@/lib/firebase';
 import {
   collection, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, orderBy, query
@@ -54,6 +55,18 @@ function dataUrlToBlob(dataUrl: string): Blob {
 // 사진 1장 = albums/{albumId}/photos/{itemId} 문서 1개 (문서당 1MB 제한 회피)
 async function savePhotoDoc(albumId: string, itemId: string, dataUrl: string, name: string) {
   await setDoc(doc(db, 'albums', albumId, 'photos', itemId), { data: dataUrl, name });
+}
+
+// ── 사진 저장(다운로드) ──
+function downloadPhoto(url: string, name: string) {
+  if (!url) return;
+  const a = document.createElement('a');
+  a.href = url;
+  // 확장자가 없으면 .jpg를 붙인다
+  a.download = /\.(jpe?g|png|webp)$/i.test(name) ? name : `${name || 'taes-photo'}.jpg`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 // 앨범 문서의 items 배열에는 base64를 넣지 않는다 (1MB 제한 초과 방지)
@@ -584,12 +597,7 @@ export default function GalleryPage() {
             </div>
 
             {loading ? (
-              <div className="flex items-center justify-center py-24 text-white/30">
-                <div className="text-center">
-                  <div className="text-4xl mb-3 animate-pulse">📷</div>
-                  <div>로딩 중...</div>
-                </div>
-              </div>
+              <SkeletonGrid count={8} aspect="1 / 1" />
             ) : view === 'albums' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {filteredAlbums.map(album => (
@@ -837,6 +845,16 @@ export default function GalleryPage() {
             onTouchEnd={(e) => handleTouchEnd(e, handlePrev, handleNext)}
           >
             <button className="absolute top-3 right-3 sm:top-4 sm:right-4 text-white/50 hover:text-white text-2xl z-10 p-2 touch-manipulation" onClick={() => setLightbox(null)}>✕</button>
+
+            {/* 사진 저장 */}
+            <button
+              onClick={e => { e.stopPropagation(); downloadPhoto(item.url, item.name); }}
+              className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-bold text-white/80 hover:text-white border border-white/20 hover:border-white/50 transition-colors touch-manipulation"
+              style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+              title="이 사진을 기기에 저장합니다"
+            >
+              ⬇ 사진 저장
+            </button>
 
             {lightbox.itemIdx > 0 && (
               <button

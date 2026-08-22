@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAdminAuth } from '@/components/AdminAuth';
+import { SkeletonRows } from '@/components/Skeleton';
 import { db } from '@/lib/firebase';
 import {
   collection, getDocs, doc, setDoc, deleteDoc, orderBy, query
@@ -151,12 +152,7 @@ export default function NoticePage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-24 text-white/30">
-            <div className="text-center">
-              <div className="text-4xl mb-3 animate-pulse">📋</div>
-              <div>로딩 중...</div>
-            </div>
-          </div>
+          <SkeletonRows count={6} height={72} />
         ) : (
           <>
             {/* 공지 없을 때 */}

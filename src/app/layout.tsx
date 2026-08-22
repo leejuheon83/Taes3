@@ -1,5 +1,22 @@
 import type { Metadata, Viewport } from "next";
+import { Noto_Sans_KR, Black_Han_Sans } from "next/font/google";
 import "./globals.css";
+
+// 본문용 한글 서체
+const notoSansKR = Noto_Sans_KR({
+  subsets: ["latin"],
+  weight: ["400", "500", "700", "900"],
+  display: "swap",
+  variable: "--font-body",
+});
+
+// 제목용 굵은 한글 서체 (스포츠 느낌)
+const blackHanSans = Black_Han_Sans({
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+  variable: "--font-display",
+});
 import Navbar from "@/components/Navbar";
 import PWARegister from "@/components/PWARegister";
 
@@ -32,7 +49,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className="h-full">
+    <html lang="ko" className={`h-full ${notoSansKR.variable} ${blackHanSans.variable}`}>
       <body className="min-h-full flex flex-col text-white antialiased" style={{ backgroundColor: '#080808' }}>
         <PWARegister />
         <Navbar />

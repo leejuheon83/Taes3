@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
+import { SkeletonRows } from '@/components/Skeleton';
 import { db } from '@/lib/firebase';
 import {
   collection, getDocs, doc, setDoc, deleteDoc, orderBy, query
@@ -301,12 +302,7 @@ export default function SchedulePage() {
         {/* Match list */}
         <div className="space-y-3">
           {loading ? (
-            <div className="flex items-center justify-center py-24 text-white/30">
-              <div className="text-center">
-                <div className="text-4xl mb-3 animate-pulse">⚽</div>
-                <div>로딩 중...</div>
-              </div>
-            </div>
+            <SkeletonRows count={5} height={92} />
           ) : filtered.length === 0 ? (
             <div className="py-20 text-center text-white/30 border border-white/10" style={{ backgroundColor: '#080808' }}>
               경기가 없습니다.

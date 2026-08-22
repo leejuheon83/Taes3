@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { useRouter } from 'next/navigation';
+import { SkeletonGrid } from '@/components/Skeleton';
 import { db } from '@/lib/firebase';
 import {
   collection, getDocs, doc, setDoc, deleteDoc, getDoc, orderBy, query
@@ -177,12 +178,7 @@ export default function VideosPage() {
       <div className="max-w-6xl mx-auto px-4 py-10">
 
         {loading ? (
-          <div className="flex items-center justify-center py-24 text-white/30">
-            <div className="text-center">
-              <div className="text-4xl mb-3 animate-pulse">🎬</div>
-              <div>로딩 중...</div>
-            </div>
-          </div>
+          <SkeletonGrid count={8} aspect="16 / 9" />
         ) : (
           <>
             {/* Featured player */}
