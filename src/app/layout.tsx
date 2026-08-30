@@ -19,6 +19,7 @@ const blackHanSans = Black_Han_Sans({
 });
 import Navbar from "@/components/Navbar";
 import PWARegister from "@/components/PWARegister";
+import MusicToggle from "@/components/MusicToggle";
 
 export const metadata: Metadata = {
   title: "TAES FC PREMIER | 태즈 FC 프리미어",
@@ -52,6 +53,7 @@ export default function RootLayout({
     <html lang="ko" className={`h-full ${notoSansKR.variable} ${blackHanSans.variable}`}>
       <body className="min-h-full flex flex-col text-white antialiased" style={{ backgroundColor: '#080808' }}>
         <PWARegister />
+        <MusicToggle />
         <Navbar />
         <main className="flex-1 pt-[88px]">
           {children}

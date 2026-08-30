@@ -293,3 +293,46 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .skeleton-block::after { animation: none; }
 }
+
+/* ── 배경음악 토글 버튼 ── */
+.music-toggle {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 0;
+  padding: 9px 13px;
+  border: 1px solid;
+  border-radius: 999px;
+  background: rgba(10, 6, 6, 0.82);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+.music-toggle:hover { transform: translateY(-2px); }
+.music-toggle:active { transform: translateY(0); }
+
+/* 재생 중 표시용 막대 */
+.music-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
+.music-bars i {
+  width: 2.5px;
+  border-radius: 1px;
+  background: #ff3b25;
+  animation: music-bar 0.9s ease-in-out infinite;
+}
+.music-bars i:nth-child(1) { height: 55%; animation-delay: -0.2s; }
+.music-bars i:nth-child(2) { height: 100%; animation-delay: -0.5s; }
+.music-bars i:nth-child(3) { height: 70%; animation-delay: -0.35s; }
+@keyframes music-bar {
+  0%, 100% { transform: scaleY(0.4); }
+  50%      { transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) { .music-bars i { animation: none; } }
+
+/* 모바일에서는 조금 더 안쪽으로 */
+@media (max-width: 640px) {
+  .music-toggle { right: 12px; bottom: 12px; padding: 8px 11px; }
+}
