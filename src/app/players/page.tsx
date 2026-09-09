@@ -7,7 +7,7 @@ import { useAdminAuth } from '@/components/AdminAuth';
 import SearchPlayerCard from '@/components/SearchPlayerCard';
 import { db } from '@/lib/firebase';
 import {
-  collection, getDocs, getDoc, doc, setDoc, deleteDoc, orderBy, query
+  collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, orderBy, query
 } from 'firebase/firestore';
 
 // ── 이미지 로딩 헬퍼 ──
@@ -97,9 +97,24 @@ async function generateCardCanvas(player: Player): Promise<HTMLCanvasElement> {
   ctx.shadowColor = 'rgba(255,36,23,0.6)'; ctx.shadowBlur = 12;
   const pos = (player.positions?.length ? player.positions : [player.pos]).join('·');
   ctx.fillText(pos, W * 0.095, H * 0.075 + W * 0.145);
+  // 주장 완장
+  const capY = H * 0.075 + W * 0.215;
+  if (player.captain) {
+    const r = W * 0.032, cx = W * 0.095 + r, cy = capY + r;
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,200,90,0.75)'; ctx.shadowBlur = 16;
+    const cg = ctx.createLinearGradient(0, cy - r, 0, cy + r);
+    cg.addColorStop(0, '#fff3d0'); cg.addColorStop(0.42, '#ffd666'); cg.addColorStop(1, '#c9910d');
+    ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0; ctx.fillStyle = '#2a1a00';
+    ctx.font = `800 ${W * 0.042}px ${numFont}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('C', cx, cy + W * 0.002);
+    ctx.restore();
+  }
   if (player.honorary) {
     ctx.shadowBlur = 0; ctx.font = `900 ${W * 0.032}px ${nameFont}`;
-    const y = H * 0.075 + W * 0.215;
+    const y = capY + (player.captain ? W * 0.085 : 0);
     ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.strokeStyle = 'rgba(251,191,36,0.4)';
     ctx.beginPath(); ctx.roundRect(W * 0.095, y, W * 0.2, W * 0.045, 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#fbbf24'; ctx.fillText('★ 명예회원', W * 0.11, y + W * 0.007);
@@ -237,6 +252,7 @@ type Player = {
   positions: PosKey[];
   grade: '3학년';
   honorary: boolean;
+  captain: boolean;
   stats: { spd: number; sht: number; pas: number; dri: number; def: number; phy: number };
   photo?: string;
   modelPhoto?: string;
@@ -363,6 +379,7 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
           <div className="fcard__ovr">
             <span className="fcard__ovr-n">{ovr}</span>
             <span className="fcard__ovr-pos">{(player.positions?.length ? player.positions : [player.pos]).join('·')}</span>
+            {player.captain && <span className="fcard__cap" title="주장"><i aria-hidden>C</i><span className="sr-only">주장</span></span>}
             {player.honorary && <span className="fcard__hon">★ 명예회원</span>}
           </div>
 
@@ -484,6 +501,7 @@ const emptyForm = {
   positions: ['FW'] as PosKey[],
   grade: '3학년' as Player['grade'],
   honorary: false,
+  captain: false,
   spd: '', sht: '', pas: '', dri: '', def: '', phy: '',
   photo: '',
   modelPhoto: '',
@@ -498,6 +516,7 @@ function playerToForm(p: Player): FormState {
     positions: (p.positions?.length ? p.positions : [p.pos as PosKey]),
     grade: p.grade,
     honorary: p.honorary ?? false,
+    captain: p.captain ?? false,
     spd: String(p.stats?.spd ?? 0), sht: String(p.stats?.sht ?? 0), pas: String(p.stats?.pas ?? 0),
     dri: String(p.stats?.dri ?? 0), def: String(p.stats?.def ?? 0), phy: String(p.stats?.phy ?? 0),
     photo: p.photo || p.photoURL || '',
@@ -575,6 +594,7 @@ function PlayersContent() {
             positions: data.positions ?? [data.pos],
             grade: data.grade,
             honorary: data.honorary ?? false,
+            captain: data.captain ?? false,
             stats: data.stats ?? { spd: 0, sht: 0, pas: 0, dri: 0, def: 0, phy: 0 },
             photoURL: data.photoURL ?? null,
             modelPhotoURL: data.modelPhotoURL ?? null,
@@ -651,6 +671,7 @@ function PlayersContent() {
         positions,
         grade: form.grade,
         honorary: form.honorary,
+        captain: form.captain,
         stats: {
           spd: Number(form.spd), sht: Number(form.sht), pas: Number(form.pas),
           dri: Number(form.dri), def: Number(form.def), phy: Number(form.phy),
@@ -660,6 +681,13 @@ function PlayersContent() {
       };
 
       await setDoc(doc(db, 'players', playerId), playerData);
+
+      // 주장은 한 명만 — 새로 지정하면 기존 주장의 표시를 내린다
+      let demoted: string[] = [];
+      if (form.captain) {
+        demoted = players.filter(p => p.captain && p.id !== playerId).map(p => p.id);
+        await Promise.all(demoted.map(id => updateDoc(doc(db, 'players', id), { captain: false })));
+      }
 
       // Firestore에서 실제 저장된 값을 다시 읽어와서 표시
       const savedDoc = await getDoc(doc(db, 'players', playerId));
@@ -672,6 +700,7 @@ function PlayersContent() {
         positions: savedData.positions ?? [savedData.pos],
         grade: savedData.grade,
         honorary: savedData.honorary ?? false,
+        captain: savedData.captain ?? false,
         stats: savedData.stats ?? { spd: 0, sht: 0, pas: 0, dri: 0, def: 0, phy: 0 },
         photoURL: savedData.photoURL ?? null,
         modelPhotoURL: savedData.modelPhotoURL ?? null,
@@ -682,13 +711,16 @@ function PlayersContent() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
 
+      const clearOthers = (list: Player[]) =>
+        demoted.length ? list.map(p => demoted.includes(p.id) ? { ...p, captain: false } : p) : list;
+
       if (editMode && selected) {
-        setPlayers(prev => prev.map(p => p.id === selected.id ? updatedPlayer : p));
+        setPlayers(prev => clearOthers(prev).map(p => p.id === selected.id ? updatedPlayer : p));
         setEditMode(false);
         setAddMode(false);
         setSelected(updatedPlayer);
       } else {
-        setPlayers(prev => [...prev, updatedPlayer]);
+        setPlayers(prev => [...clearOthers(prev), updatedPlayer]);
         closeModal();
       }
     } catch (err: unknown) {
@@ -831,6 +863,7 @@ function PlayersContent() {
                       ['등번호', `#${selected.no}`],
                       ['학년', selected.grade],
                       ['포지션', (selected.positions ?? [selected.pos]).join(' · ')],
+                      ...(selected.captain ? [['주장', '⒞ 팀 주장']] : []),
                     ].map(([k, v]) => (
                       <div key={k} className="flex justify-between border-b border-white/5 pb-2">
                         <span className="text-white/40 text-sm">{k}</span>
@@ -971,6 +1004,39 @@ function PlayersContent() {
                   </div>
                 </div>
 
+                {/* 주장 */}
+                <label
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-all"
+                  style={{
+                    backgroundColor: form.captain ? 'rgba(255,214,102,0.08)' : '#0a0a0a',
+                    border: `1px solid ${form.captain ? 'rgba(255,214,102,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                    borderRadius: 4,
+                  }}
+                >
+                  <div
+                    className="flex-shrink-0 flex items-center justify-center transition-all"
+                    style={{
+                      width: 20, height: 20, borderRadius: 4,
+                      backgroundColor: form.captain ? '#ffd666' : 'transparent',
+                      border: `2px solid ${form.captain ? '#ffd666' : 'rgba(255,255,255,0.2)'}`,
+                      boxShadow: form.captain ? '0 0 10px #ffd66660' : 'none',
+                    }}
+                  >
+                    {form.captain && <span style={{ color: '#000', fontSize: 12, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                  </div>
+                  <input type="checkbox" checked={form.captain}
+                    onChange={e => setForm(f => ({ ...f, captain: e.target.checked }))}
+                    className="hidden" />
+                  <div>
+                    <div className="font-bold text-sm" style={{ color: form.captain ? '#ffd666' : 'rgba(255,255,255,0.5)' }}>
+                      Ⓒ 주장
+                    </div>
+                    <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                      카드에 주장 표시가 붙습니다. 주장은 한 명만 지정됩니다
+                    </div>
+                  </div>
+                </label>
+
                 {/* 명예회원 */}
                 <label
                   className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-all"
@@ -988,7 +1054,6 @@ function PlayersContent() {
                       border: `2px solid ${form.honorary ? '#f59e0b' : 'rgba(255,255,255,0.2)'}`,
                       boxShadow: form.honorary ? '0 0 10px #f59e0b60' : 'none',
                     }}
-                    onClick={() => setForm(f => ({ ...f, honorary: !f.honorary }))}
                   >
                     {form.honorary && <span style={{ color: '#000', fontSize: 12, fontWeight: 900, lineHeight: 1 }}>✓</span>}
                   </div>

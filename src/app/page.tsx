@@ -74,6 +74,7 @@ type PlayerCard = {
   id: string; no: number; name: string;
   pos: string; positions: string[];
   honorary: boolean;
+  captain: boolean;
   photo?: string; photoURL?: string | null;
   stats: { spd: number; sht: number; pas: number; dri: number; def: number; phy: number };
 };
@@ -98,6 +99,7 @@ function MiniCard({ p }: { p: PlayerCard }) {
         <div className="fcard__ovr">
           <span className="fcard__ovr-n">{ovr}</span>
           <span className="fcard__ovr-pos">{pos}</span>
+          {p.captain && <span className="fcard__cap" title="주장"><i aria-hidden>C</i><span className="sr-only">주장</span></span>}
         </div>
         <h3 className={`fcard__name${p.name.length > 4 ? ' is-long' : ''}`}>{p.name}</h3>
         <div className="fcard__num">
@@ -193,6 +195,7 @@ export default function Home() {
           if (grade in counts) counts[grade]++;
           loadedPlayers.push({
             id: d.id, ...data,
+            captain: data.captain ?? false,
             stats: data.stats ?? { spd: 0, sht: 0, pas: 0, dri: 0, def: 0, phy: 0 },
           } as PlayerCard);
         });

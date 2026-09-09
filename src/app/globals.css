@@ -474,6 +474,28 @@ body {
 }
 /* MANAGER처럼 긴 라벨은 사진 창을 침범하지 않게 줄인다 */
 .fcard__ovr-pos.is-long { font-size: 4.3cqw; letter-spacing: .04em; }
+/* 주장 표시 — 완장처럼 동그란 C */
+.fcard__cap {
+  margin-top: 1.6cqw;
+  display: inline-grid; place-items: center;
+  width: 6.4cqw; height: 6.4cqw;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff3d0 0%, #ffd666 42%, #c9910d 100%);
+  box-shadow: 0 0 2cqw rgba(255, 200, 90, .75), 0 0.3cqw 0.6cqw rgba(0, 0, 0, .8);
+}
+.fcard__cap i {
+  font-style: normal;
+  font-family: var(--font-num), sans-serif;
+  font-weight: 800;
+  font-size: 4.2cqw; line-height: 1;
+  color: #2a1a00;
+}
+/* 화면에는 안 보이지만 읽어주는 기계에는 전달되는 글자 */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; border: 0;
+}
 .fcard__hon {
   margin-top: 1.4cqw;
   font-size: 3.2cqw; font-weight: 900; letter-spacing: .06em;
@@ -626,6 +648,8 @@ body {
 .mini-card .fcard__num-n { font-size: 7cqw; }
 .mini-card .fcard__ovr-n.is-word { font-size: 12.5cqw; }
 .mini-card .fcard__stat-k { font-size: 3.4cqw; letter-spacing: .1em; }
+.mini-card .fcard__cap { width: 8cqw; height: 8cqw; margin-top: 1.2cqw; }
+.mini-card .fcard__cap i { font-size: 5.2cqw; }
 .mini-card .fcard__note { font-size: 4.6cqw; }
 .mini-card .fcard__note-lab { font-size: 3.4cqw; letter-spacing: .12em; }
 @media (prefers-reduced-motion: reduce) { .mini-card:hover { transform: none; } }
