@@ -68,7 +68,7 @@ function StaffCard({ staff, onEdit, onDelete }: {
         {/* 사진 */}
         {staff.photoURL ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="fcard__shot" src={staff.photoURL} alt={staff.name} draggable={false} />
+          <img className="fcard__shot is-photo" src={staff.photoURL} alt={staff.name} draggable={false} />
         ) : (
           <div className="fcard__noshot">{staff.name.charAt(0)}</div>
         )}

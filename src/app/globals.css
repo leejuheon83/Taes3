@@ -408,17 +408,27 @@ body {
   pointer-events: none;
   user-select: none;
 }
-/* 사진: 프레임 가운데 창에만 보이게 */
+/* 사진: 프레임 가운데 창에 통째로 담는다.
+   잘라내기(cover) 대신 맞추기(contain)라서 머리카락이 잘리지 않는다. */
 .fcard__shot {
   position: absolute;
-  left: 13%; width: 74%;
-  top: 16.5%; height: 47.5%;
+  left: 10%; width: 80%;
+  top: 12.5%; height: 51.5%;
   z-index: 3;
-  object-fit: cover; object-position: 50% 40%;
-  -webkit-mask-image: radial-gradient(ellipse 80% 86% at 50% 47%, #000 74%, rgba(0,0,0,.6) 90%, transparent 100%);
-  mask-image: radial-gradient(ellipse 80% 86% at 50% 47%, #000 74%, rgba(0,0,0,.6) 90%, transparent 100%);
+  object-fit: contain; object-position: 50% 100%;
+  /* 아래쪽(가슴 잘린 면)만 서서히 사라지게 한다. 위·옆은 건드리지 않는다. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 76%, rgba(0,0,0,.5) 91%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 76%, rgba(0,0,0,.5) 91%, transparent 100%);
   filter: contrast(1.05) saturate(1.04) drop-shadow(0 1cqw 2cqw rgba(0,0,0,.7));
   pointer-events: none;
+}
+/* 배경을 지우지 않은 일반 사진도 잘라내지 않고 통째로 담되,
+   네모난 가장자리는 타원으로 흐려 프레임에 녹인다 */
+.fcard__shot.is-photo {
+  top: 14%; height: 49%;
+  object-fit: contain; object-position: 50% 50%;
+  -webkit-mask-image: radial-gradient(ellipse 84% 96% at 50% 50%, #000 76%, rgba(0,0,0,.55) 92%, transparent 100%);
+  mask-image: radial-gradient(ellipse 84% 96% at 50% 50%, #000 76%, rgba(0,0,0,.55) 92%, transparent 100%);
 }
 .fcard__noshot {
   position: absolute; z-index: 3;
@@ -597,3 +607,17 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .fcard__shine::before { animation: none; opacity: 0; }
 }
+
+/* 메인 미리보기용 작은 카드 — 좁아서 흐려지는 요소를 정리한다 */
+.mini-card {
+  transition: transform .2s ease;
+}
+.mini-card:hover { transform: translateY(-5px) scale(1.03); }
+.mini-card .fcard__num-in { padding: 0.9cqw 5.5cqw; }
+.mini-card .fcard__num-lab { font-size: 4.4cqw; }
+.mini-card .fcard__num-n { font-size: 7cqw; }
+.mini-card .fcard__ovr-n.is-word { font-size: 12.5cqw; }
+.mini-card .fcard__stat-k { font-size: 3.4cqw; letter-spacing: .1em; }
+.mini-card .fcard__note { font-size: 4.6cqw; }
+.mini-card .fcard__note-lab { font-size: 3.4cqw; letter-spacing: .12em; }
+@media (prefers-reduced-motion: reduce) { .mini-card:hover { transform: none; } }

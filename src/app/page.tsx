@@ -10,90 +10,54 @@ type StaffCard = {
   id: string; name: string; role: string; career: string; order: number; photoURL: string | null;
 };
 
+// 메인 미리보기 카드 — 선수단 페이지와 같은 프레임을 작은 폭으로
+const MINI_W = 132;
+const STAT_SLOTS: [number, number][] = [
+  [10.3, 64.0], [37.7, 64.0], [65.0, 64.0],
+  [10.3, 75.8], [37.7, 75.8], [65.0, 75.8],
+];
+
 function MiniStaffCard({ s }: { s: StaffCard }) {
-  const isManager = s.role === '감독';
-  const gold = { base:'#ffe066', glow:'#f5b800', border:'#a86800', borderHi:'#ffe066', mid:'rgba(255,200,0,0.08)' };
+  const cls = s.role.includes('감독') ? 'fcard--gold'
+    : s.role.includes('골키퍼') ? 'fcard--green'
+    : s.role.includes('피지컬') ? 'fcard--purple'
+    : s.role.includes('코치') ? 'fcard--blue' : '';
+  const frame = cls ? `/card-frame-${cls.replace('fcard--', '')}.webp` : '/card-frame.webp';
+  const career = s.career?.split('\n').map(l => l.trim()).find(Boolean) ?? '';
   return (
-    <Link href="/about/staff" className="block flex-shrink-0" style={{ width: 110 }}>
-      <div className="relative overflow-hidden"
-        style={{
-          aspectRatio: '3/4.2', borderRadius: 12,
-          background: 'linear-gradient(155deg,#140e00 0%,#060400 50%,#000 100%)',
-          boxShadow: `0 2px 0 ${gold.border}, 0 8px 32px rgba(0,0,0,0.95)`,
-          transition: 'transform 0.2s, box-shadow 0.2s',
-        }}
-        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-5px) scale(1.03)'; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'none'; }}
-      >
-        {/* 카본 파이버 패턴 */}
-        <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', pointerEvents:'none' }}>
-          <defs>
-            <pattern id={`cf-s-${s.id}`} x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
-              <rect width="4" height="4" fill="transparent"/>
-              <rect x="0" y="0" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
-              <rect x="2" y="2" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
-            </pattern>
-            <radialGradient id={`cg-s-${s.id}`} cx="50%" cy="38%" r="52%">
-              <stop offset="0%" stopColor={gold.glow} stopOpacity="0.18"/>
-              <stop offset="100%" stopColor={gold.glow} stopOpacity="0"/>
-            </radialGradient>
-          </defs>
-          <rect width="100%" height="100%" fill={`url(#cf-s-${s.id})`}/>
-          <ellipse cx="50%" cy="38%" rx="58%" ry="48%" fill={`url(#cg-s-${s.id})`}/>
-        </svg>
-        {/* 광택 */}
-        <div style={{ position:'absolute', inset:0, pointerEvents:'none', borderRadius:12,
-          background:'linear-gradient(128deg,rgba(255,255,255,0.09) 0%,rgba(255,255,255,0.02) 28%,transparent 52%)' }}/>
-        {/* 골드 테두리 */}
-        <div style={{ position:'absolute', inset:0, borderRadius:12, zIndex:22, pointerEvents:'none',
-          background:`linear-gradient(145deg,${gold.borderHi} 0%,rgba(255,255,255,0.5) 18%,${gold.glow} 38%,${gold.border} 62%,${gold.borderHi}44 85%,${gold.border} 100%)`,
-          padding:'1.5px', WebkitMask:'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-          WebkitMaskComposite:'xor', maskComposite:'exclude' }}/>
-        {/* 상단 골드 라인 */}
-        <div style={{ position:'absolute', top:0, left:0, right:0, height:2, zIndex:25, pointerEvents:'none',
-          background:`linear-gradient(90deg,transparent,${gold.border} 12%,${gold.glow} 32%,rgba(255,240,180,0.9) 50%,${gold.glow} 68%,${gold.border} 88%,transparent)`,
-          borderRadius:'12px 12px 0 0' }}/>
-        {/* TAES 로고 워터마크 */}
+    <Link href="/about/staff" className="block flex-shrink-0" style={{ width: MINI_W }}>
+      <div className={`fcard ${cls} mini-card`}>
+        {s.photoURL ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="fcard__shot is-photo" src={s.photoURL} alt={s.name} draggable={false} />
+        ) : (
+          <div className="fcard__noshot">{s.name.charAt(0)}</div>
+        )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/taes-emblem.png" alt="" aria-hidden style={{ position:'absolute', top:'50%', left:'50%',
-          transform:'translate(-50%,-52%)', width:'78%', pointerEvents:'none',
-          opacity:0.22, filter:'grayscale(1) brightness(2)', zIndex:2 }}/>
-        {/* 상단 좌측: MANAGER 뱃지 */}
-        <div style={{ position:'absolute', top:7, left:8, zIndex:15 }}>
-          <div style={{ fontSize:7, fontWeight:900, color:gold.base, backgroundColor:gold.glow,
-            padding:'2px 5px', borderRadius:2, letterSpacing:'0.05em',
-            boxShadow:`0 0 8px ${gold.glow}80` }}>{isManager ? 'MANAGER' : s.role}</div>
+        <img className="fcard__frame" src={frame} alt="" aria-hidden draggable={false} />
+        <div className="fcard__ovr">
+          <span className="fcard__ovr-n is-word">{s.role}</span>
         </div>
-        {/* TAES FC */}
-        <div style={{ position:'absolute', top:7, right:7, textAlign:'right', zIndex:15 }}>
-          <div style={{ fontSize:7.5, fontWeight:900, color:gold.base, letterSpacing:'0.1em', opacity:0.9 }}>TAES</div>
-          <div style={{ fontSize:5.5, fontWeight:700, color:'rgba(255,255,255,0.28)', letterSpacing:'0.1em', marginTop:1 }}>FC</div>
-        </div>
-        {/* 사진 */}
-        <div style={{ position:'absolute', bottom:'20%', left:'50%', transform:'translateX(-50%)',
-          width:'90%', height:'60%', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:10 }}>
-          {s.photoURL ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={s.photoURL} alt={s.name} style={{ maxHeight:'100%', maxWidth:'100%', objectFit:'contain',
-              filter:`drop-shadow(0 3px 12px rgba(0,0,0,0.95)) drop-shadow(0 0 8px ${gold.glow}30)` }}/>
-          ) : (
-            <div style={{ fontSize:28, fontWeight:900, color:gold.glow, opacity:0.5,
-              textShadow:`0 0 20px ${gold.glow}` }}>★</div>
-          )}
-        </div>
-        {/* 하단 이름 패널 */}
-        <div style={{ position:'absolute', bottom:0, left:0, right:0, zIndex:15,
-          background:'linear-gradient(to top,rgba(0,0,0,0.97) 0%,rgba(0,0,0,0.85) 55%,transparent 100%)',
-          padding:'18px 7px 7px', borderRadius:'0 0 12px 12px' }}>
-          <div style={{ height:1, marginBottom:5,
-            background:`linear-gradient(to right,transparent,${gold.border} 10%,${gold.base} 32%,rgba(255,240,180,0.7) 50%,${gold.base} 68%,${gold.border} 90%,transparent)`,
-            boxShadow:`0 0 4px ${gold.glow}45` }}/>
-          <div style={{ textAlign:'center' }}>
-            <div style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:'0.04em',
-              textShadow:`0 0 10px ${gold.glow}55` }}>{s.name}</div>
-            <div style={{ fontSize:8, fontWeight:700, color:gold.base, marginTop:2, opacity:0.7 }}>{s.role}</div>
+        <h3 className={`fcard__name${s.name.length > 4 ? ' is-long' : ''}`}>{s.name}</h3>
+        <div className="fcard__num">
+          <div className="fcard__num-in">
+            <i className="fcard__num-d" aria-hidden />
+            <span className="fcard__num-lab">SEASON</span>
+            <b className="fcard__num-n">2026</b>
+            <i className="fcard__num-d" aria-hidden />
           </div>
         </div>
+        {career && (
+          <>
+            <div className="fcard__note" style={{ top: '64%', height: '9.4%' }}>
+              <span className="fcard__note-lab" style={{ margin: 0 }}>CAREER</span>
+            </div>
+            <div className="fcard__note" style={{ top: '75.8%', height: '9.4%' }}>
+              <div>{career}</div>
+            </div>
+          </>
+        )}
+        <div className="fcard__shine d3" aria-hidden />
       </div>
     </Link>
   );
@@ -112,93 +76,41 @@ function MiniCard({ p }: { p: PlayerCard }) {
   const ovr = Math.round((s.spd + s.sht + s.pas + s.dri + s.def + s.phy) / 6);
   const photo = p.photo || p.photoURL || undefined;
   const pos = (p.positions?.length ? p.positions : [p.pos]).join('·');
+  const shine = (String(p.id).split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 4) + 1;
   return (
-    <Link href="/players" className="block flex-shrink-0" style={{ width: 110 }}>
-      <div className="relative overflow-hidden"
-        style={{
-          aspectRatio: '3/4.2', borderRadius: 12,
-          background: 'linear-gradient(155deg,#140000 0%,#060000 50%,#000 100%)',
-          boxShadow: '0 2px 0 #7a0000, 0 8px 32px rgba(0,0,0,0.95)',
-          transition: 'transform 0.2s, box-shadow 0.2s',
-        }}
-        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-5px) scale(1.03)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 0 #7a0000, 0 16px 40px rgba(0,0,0,0.98)'; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'none'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 0 #7a0000, 0 8px 32px rgba(0,0,0,0.95)'; }}
-      >
-        {/* 카본 파이버 패턴 */}
-        <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', pointerEvents:'none' }}>
-          <defs>
-            <pattern id={`cf-m-${p.id}`} x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
-              <rect width="4" height="4" fill="transparent"/>
-              <rect x="0" y="0" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
-              <rect x="2" y="2" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
-            </pattern>
-            <radialGradient id={`cg-m-${p.id}`} cx="50%" cy="38%" r="52%">
-              <stop offset="0%" stopColor="#bb0000" stopOpacity="0.15"/>
-              <stop offset="100%" stopColor="#bb0000" stopOpacity="0"/>
-            </radialGradient>
-          </defs>
-          <rect width="100%" height="100%" fill={`url(#cf-m-${p.id})`}/>
-          <ellipse cx="50%" cy="38%" rx="58%" ry="48%" fill={`url(#cg-m-${p.id})`}/>
-        </svg>
-        {/* 경사 광택 */}
-        <div style={{ position:'absolute', inset:0, pointerEvents:'none', borderRadius:12,
-          background:'linear-gradient(128deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.02) 28%, transparent 52%)' }}/>
-        {/* 테두리 */}
-        <div style={{ position:'absolute', inset:0, borderRadius:12, zIndex:22, pointerEvents:'none',
-          background:'linear-gradient(145deg,#ff4444 0%,rgba(255,255,255,0.5) 18%,#dc2626 38%,#7a0000 62%,#ff444444 85%,#7a0000 100%)',
-          padding:'1.5px', WebkitMask:'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-          WebkitMaskComposite:'xor', maskComposite:'exclude' }}/>
-        {/* 상단 라인 */}
-        <div style={{ position:'absolute', top:0, left:0, right:0, height:2, zIndex:25, pointerEvents:'none',
-          background:'linear-gradient(90deg,transparent,#7a0000 12%,#dc2626 32%,rgba(255,180,180,0.9) 50%,#dc2626 68%,#7a0000 88%,transparent)',
-          borderRadius:'12px 12px 0 0' }}/>
-        {/* TAES 로고 워터마크 */}
+    <Link href="/players" className="block flex-shrink-0" style={{ width: MINI_W }}>
+      <div className="fcard mini-card">
+        {photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="fcard__shot" src={photo} alt={p.name} draggable={false} />
+        ) : (
+          <div className="fcard__noshot">#{p.no}</div>
+        )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/taes-emblem.png" alt="" aria-hidden style={{ position:'absolute', top:'50%', left:'50%',
-          transform:'translate(-50%,-52%)', width:'78%', pointerEvents:'none',
-          opacity:0.22, filter:'grayscale(1) brightness(2)', zIndex:2 }}/>
-        {/* 상단 좌측: OVR + 포지션 */}
-        <div style={{ position:'absolute', top:7, left:8, zIndex:15 }}>
-          <div style={{ fontSize:20, fontWeight:900, color:'#fff', lineHeight:1,
-            textShadow:'0 0 12px #bb0000, 0 2px 6px rgba(0,0,0,0.9)' }}>{ovr}</div>
-          <div style={{ fontSize:7.5, fontWeight:900, color:'#ff5252', letterSpacing:'0.06em', marginTop:1,
-            textShadow:'0 0 7px #bb0000' }}>{pos}</div>
-          {p.honorary && (
-            <div style={{ marginTop:3, fontSize:5.5, fontWeight:900, color:'#fbbf24',
-              border:'1px solid #fbbf2460', padding:'1px 3px', borderRadius:2,
-              textShadow:'0 0 5px #d4a01770' }}>★ 명예회원</div>
-          )}
+        <img className="fcard__frame" src="/card-frame.webp" alt="" aria-hidden draggable={false} />
+        <div className="fcard__ovr">
+          <span className="fcard__ovr-n">{ovr}</span>
+          <span className="fcard__ovr-pos">{pos}</span>
         </div>
-        {/* TAES FC */}
-        <div style={{ position:'absolute', top:7, right:7, textAlign:'right', zIndex:15 }}>
-          <div style={{ fontSize:7.5, fontWeight:900, color:'#ff5252', letterSpacing:'0.1em', opacity:0.85 }}>TAES</div>
-          <div style={{ fontSize:5.5, fontWeight:700, color:'rgba(255,255,255,0.28)', letterSpacing:'0.1em', marginTop:1 }}>FC</div>
-        </div>
-        {/* 선수 사진 */}
-        <div style={{ position:'absolute', bottom:'20%', left:'50%', transform:'translateX(-50%)',
-          width:'90%', height:'60%', display:'flex', alignItems:'flex-end', justifyContent:'center', zIndex:10 }}>
-          {photo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photo} alt={p.name} style={{ maxHeight:'100%', maxWidth:'100%', objectFit:'contain',
-              filter:'drop-shadow(0 3px 12px rgba(0,0,0,0.95)) drop-shadow(0 0 8px #bb000030)' }}/>
-          ) : (
-            <div style={{ fontSize:26, fontWeight:900, color:'#dc2626', opacity:0.4,
-              textShadow:'0 0 20px #bb0000' }}>#{p.no}</div>
-          )}
-        </div>
-        {/* 하단 이름 패널 */}
-        <div style={{ position:'absolute', bottom:0, left:0, right:0, zIndex:15,
-          background:'linear-gradient(to top,rgba(0,0,0,0.97) 0%,rgba(0,0,0,0.85) 55%,transparent 100%)',
-          padding:'18px 7px 7px', borderRadius:'0 0 12px 12px' }}>
-          <div style={{ height:1, marginBottom:5,
-            background:'linear-gradient(to right,transparent,#7a0000 10%,#ff5252 32%,rgba(255,200,200,0.7) 50%,#ff5252 68%,#7a0000 90%,transparent)',
-            boxShadow:'0 0 4px #bb000045' }}/>
-          <div style={{ textAlign:'center' }}>
-            <div style={{ fontSize:10, fontWeight:900, color:'#fff', letterSpacing:'0.04em',
-              textShadow:'0 0 10px #bb000055' }}>{p.name}</div>
-            <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.35)', marginTop:2 }}>No.{p.no}</div>
+        <h3 className={`fcard__name${p.name.length > 4 ? ' is-long' : ''}`}>{p.name}</h3>
+        <div className="fcard__num">
+          <div className="fcard__num-in">
+            <i className="fcard__num-d" aria-hidden />
+            <span className="fcard__num-lab">No.</span>
+            <b className="fcard__num-n">{p.no}</b>
+            <i className="fcard__num-d" aria-hidden />
           </div>
         </div>
+        {[
+          { k: 'PAC', v: s.spd }, { k: 'SHO', v: s.sht }, { k: 'PAS', v: s.pas },
+          { k: 'DRI', v: s.dri }, { k: 'DEF', v: s.def }, { k: 'PHY', v: s.phy },
+        ].map(({ k, v }, i) => (
+          <div key={k} className="fcard__stat" style={{ left: `${STAT_SLOTS[i][0]}%`, top: `${STAT_SLOTS[i][1]}%` }}>
+            <span className="fcard__stat-v">{v}</span>
+            <span className="fcard__stat-k">{k}</span>
+          </div>
+        ))}
+        <div className={`fcard__shine d${shine}`} aria-hidden />
       </div>
     </Link>
   );

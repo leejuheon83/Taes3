@@ -35,29 +35,25 @@ async function generateCardCanvas(player: Player): Promise<HTMLCanvasElement> {
   const nameFont = cssFont('--font-display', 'sans-serif');
   try { await document.fonts.ready; } catch { /* ignore */ }
 
-  // 선수 사진: 프레임 가운데 창 (left 13%, top 16.5%, w 74%, h 47.5%) — 화면과 동일
+  // 선수 사진: 화면의 카드와 같은 방식으로 창에 통째로 담는다 (잘라내지 않음)
   const photoSrc = player.photo || player.photoURL;
-  const win = { x: W * 0.13, y: H * 0.165, w: W * 0.74, h: H * 0.475 };
+  const win = { x: W * 0.10, y: H * 0.125, w: W * 0.80, h: H * 0.515 };
   if (photoSrc) {
     try {
       const ph = await loadImg(photoSrc);
       const tmp = document.createElement('canvas');
       tmp.width = W; tmp.height = H;
       const t = tmp.getContext('2d')!;
-      // object-fit: cover, object-position 50% 40%
-      const sc = Math.max(win.w / ph.width, win.h / ph.height);
+      const sc = Math.min(win.w / ph.width, win.h / ph.height);   // contain
       const dw = ph.width * sc, dh = ph.height * sc;
-      const dx = win.x + (win.w - dw) * 0.5, dy = win.y + (win.h - dh) * 0.4;
-      t.save(); t.beginPath(); t.rect(win.x, win.y, win.w, win.h); t.clip();
-      t.drawImage(ph, dx, dy, dw, dh); t.restore();
-      // 가장자리를 부드럽게 (radial mask)
-      const cx = win.x + win.w * 0.5, cy = win.y + win.h * 0.47;
-      const rx = win.w * 0.8, ry = win.h * 0.86;
+      const dx = win.x + (win.w - dw) / 2, dy = win.y + (win.h - dh);  // 아래 정렬
+      t.drawImage(ph, dx, dy, dw, dh);
+      // 아래쪽만 서서히 사라지게
       t.globalCompositeOperation = 'destination-in';
-      t.save(); t.translate(cx, cy); t.scale(1, ry / rx);
-      const m = t.createRadialGradient(0, 0, 0, 0, 0, rx);
-      m.addColorStop(0.74, 'rgba(0,0,0,1)'); m.addColorStop(0.9, 'rgba(0,0,0,0.6)'); m.addColorStop(1, 'rgba(0,0,0,0)');
-      t.fillStyle = m; t.fillRect(-W, -H * 2, W * 2, H * 4); t.restore();
+      const m = t.createLinearGradient(0, win.y, 0, win.y + win.h);
+      m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.76, 'rgba(0,0,0,1)');
+      m.addColorStop(0.91, 'rgba(0,0,0,0.5)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+      t.fillStyle = m; t.fillRect(0, win.y, W, win.h);
       ctx.drawImage(tmp, 0, 0);
     } catch { /* ignore */ }
   } else {
