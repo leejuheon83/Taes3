@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, Suspense } from 'react';
+import NextImage from 'next/image';
 import { useAdminAuth } from '@/components/AdminAuth';
 import SearchPlayerCard from '@/components/SearchPlayerCard';
 import { db } from '@/lib/firebase';
@@ -19,154 +20,152 @@ function loadImg(src: string): Promise<HTMLImageElement> {
   });
 }
 
-// ── 카드 → Canvas 생성 ──
+// ── 카드 → Canvas 생성 (화면의 프레임 카드와 같은 배치) ──
+function cssFont(varName: string, fallback: string) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  return v ? `${v}, ${fallback}` : fallback;
+}
+
 async function generateCardCanvas(player: Player): Promise<HTMLCanvasElement> {
-  const W = 400, H = 560, R = 14;
+  const W = 760, H = 1013;
   const cvs = document.createElement('canvas');
   cvs.width = W; cvs.height = H;
   const ctx = cvs.getContext('2d')!;
+  const numFont = cssFont('--font-num', 'sans-serif');
+  const nameFont = cssFont('--font-display', 'sans-serif');
+  try { await document.fonts.ready; } catch { /* ignore */ }
 
-  // 배경 그라디언트
-  const bg = ctx.createLinearGradient(W * 0.6, 0, 0, H);
-  bg.addColorStop(0, '#140000'); bg.addColorStop(0.5, '#060000'); bg.addColorStop(1, '#000');
-  ctx.fillStyle = bg;
-  ctx.beginPath(); ctx.roundRect(0, 0, W, H, R); ctx.fill();
-
-  // 카본 파이버
-  ctx.save(); ctx.globalAlpha = 0.028;
-  for (let x = 0; x < W; x += 4) for (let y = 0; y < H; y += 4) {
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(x, y, 2, 2); ctx.fillRect(x + 2, y + 2, 2, 2);
-  }
-  ctx.restore();
-
-  // 중앙 글로우
-  const glow = ctx.createRadialGradient(W/2, H*0.38, 0, W/2, H*0.38, W*0.6);
-  glow.addColorStop(0, 'rgba(187,0,0,0.18)'); glow.addColorStop(1, 'rgba(187,0,0,0)');
-  ctx.fillStyle = glow; ctx.beginPath();
-  ctx.ellipse(W/2, H*0.38, W*0.58, H*0.48, 0, 0, Math.PI*2); ctx.fill();
-
-  // TAES 로고 워터마크
-  try {
-    const logo = await loadImg('/taes-emblem.png');
-    ctx.save(); ctx.globalAlpha = 0.18;
-    const lsz = W * 0.78;
-    ctx.drawImage(logo, (W - lsz)/2, H*0.5 - lsz*0.52, lsz, lsz);
-    ctx.restore();
-  } catch { /* ignore */ }
-
-  // 선수 사진
+  // 선수 사진: 프레임 가운데 창 (left 13%, top 16.5%, w 74%, h 47.5%) — 화면과 동일
   const photoSrc = player.photo || player.photoURL;
+  const win = { x: W * 0.13, y: H * 0.165, w: W * 0.74, h: H * 0.475 };
   if (photoSrc) {
     try {
       const ph = await loadImg(photoSrc);
-      ctx.save();
-      const maxH = H * 0.62, maxW = W * 0.92;
-      let dw = ph.width, dh = ph.height;
-      if (dh > maxH) { dw = dw * maxH / dh; dh = maxH; }
-      if (dw > maxW) { dh = dh * maxW / dw; dw = maxW; }
-      ctx.drawImage(ph, (W - dw)/2, H * 0.79 - dh, dw, dh);
-      ctx.restore();
+      const tmp = document.createElement('canvas');
+      tmp.width = W; tmp.height = H;
+      const t = tmp.getContext('2d')!;
+      // object-fit: cover, object-position 50% 40%
+      const sc = Math.max(win.w / ph.width, win.h / ph.height);
+      const dw = ph.width * sc, dh = ph.height * sc;
+      const dx = win.x + (win.w - dw) * 0.5, dy = win.y + (win.h - dh) * 0.4;
+      t.save(); t.beginPath(); t.rect(win.x, win.y, win.w, win.h); t.clip();
+      t.drawImage(ph, dx, dy, dw, dh); t.restore();
+      // 가장자리를 부드럽게 (radial mask)
+      const cx = win.x + win.w * 0.5, cy = win.y + win.h * 0.47;
+      const rx = win.w * 0.8, ry = win.h * 0.86;
+      t.globalCompositeOperation = 'destination-in';
+      t.save(); t.translate(cx, cy); t.scale(1, ry / rx);
+      const m = t.createRadialGradient(0, 0, 0, 0, 0, rx);
+      m.addColorStop(0.74, 'rgba(0,0,0,1)'); m.addColorStop(0.9, 'rgba(0,0,0,0.6)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+      t.fillStyle = m; t.fillRect(-W, -H * 2, W * 2, H * 4); t.restore();
+      ctx.drawImage(tmp, 0, 0);
     } catch { /* ignore */ }
   } else {
-    ctx.save();
-    ctx.fillStyle = 'rgba(220,38,38,0.4)';
-    ctx.font = '900 80px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(`#${player.no}`, W/2, H * 0.53);
-    ctx.textAlign = 'left'; ctx.restore();
+    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,74,42,0.35)'; ctx.font = `800 ${W * 0.22}px ${numFont}`;
+    ctx.fillText(`#${player.no}`, W / 2, H * 0.4); ctx.restore();
   }
 
-  // 상단 광택
-  const shine = ctx.createLinearGradient(0, 0, W*0.7, H*0.55);
-  shine.addColorStop(0, 'rgba(255,255,255,0.10)'); shine.addColorStop(0.3, 'rgba(255,255,255,0.025)'); shine.addColorStop(0.52, 'rgba(255,255,255,0)');
-  ctx.fillStyle = shine; ctx.beginPath(); ctx.roundRect(0, 0, W, H, R); ctx.fill();
+  // 프레임
+  try { ctx.drawImage(await loadImg('/card-frame.png'), 0, 0, W, H); } catch { /* ignore */ }
 
-  // 하단 패널 배경
-  const btm = ctx.createLinearGradient(0, H*0.72, 0, H);
-  btm.addColorStop(0, 'rgba(0,0,0,0)'); btm.addColorStop(0.3, 'rgba(0,0,0,0.88)'); btm.addColorStop(1, 'rgba(0,0,0,0.97)');
-  ctx.fillStyle = btm; ctx.beginPath(); ctx.roundRect(0, H*0.55, W, H*0.45, [0,0,R,R]); ctx.fill();
+  const chrome = (y0: number, y1: number) => {
+    const g = ctx.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.36, '#dfe3e9'); g.addColorStop(1, '#868b95');
+    return g;
+  };
 
-  // 하단 글로우
-  const btmGlow = ctx.createRadialGradient(W/2, H, 0, W/2, H, W*0.75);
-  btmGlow.addColorStop(0, 'rgba(187,0,0,0.28)'); btmGlow.addColorStop(1, 'rgba(187,0,0,0)');
-  ctx.fillStyle = btmGlow; ctx.beginPath(); ctx.roundRect(0, H*0.6, W, H*0.4, [0,0,R,R]); ctx.fill();
-
-  // 메탈릭 테두리
-  const bdr = ctx.createLinearGradient(0, 0, W, H);
-  bdr.addColorStop(0,'#ff4444'); bdr.addColorStop(0.18,'rgba(255,255,255,0.55)');
-  bdr.addColorStop(0.38,'#dc2626'); bdr.addColorStop(0.62,'#7a0000');
-  bdr.addColorStop(0.85,'rgba(255,68,68,0.27)'); bdr.addColorStop(1,'#7a0000');
-  ctx.strokeStyle = bdr; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.roundRect(1.5, 1.5, W-3, H-3, R-1); ctx.stroke();
-
-  // 상단 라인
-  const topL = ctx.createLinearGradient(0, 0, W, 0);
-  topL.addColorStop(0,'transparent'); topL.addColorStop(0.12,'#7a0000');
-  topL.addColorStop(0.32,'#dc2626'); topL.addColorStop(0.5,'rgba(255,180,180,0.9)');
-  topL.addColorStop(0.68,'#dc2626'); topL.addColorStop(0.88,'#7a0000'); topL.addColorStop(1,'transparent');
-  ctx.fillStyle = topL; ctx.fillRect(0, 0, W, 2);
-
-  // OVR
+  // OVR + 포지션
   const ovr = Math.round((player.stats.spd+player.stats.sht+player.stats.pas+player.stats.dri+player.stats.def+player.stats.phy)/6);
-  ctx.save(); ctx.shadowColor='#bb0000'; ctx.shadowBlur=24;
-  ctx.fillStyle='#fff'; ctx.font='900 56px system-ui,sans-serif';
-  ctx.fillText(String(ovr), 18, 70); ctx.restore();
-
-  // 포지션
+  ctx.save(); ctx.textBaseline = 'top';
+  ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+  ctx.font = `800 ${W * 0.17}px ${numFont}`; ctx.fillStyle = chrome(H * 0.075, H * 0.075 + W * 0.14);
+  ctx.fillText(String(ovr), W * 0.095, H * 0.075);
+  ctx.font = `800 ${W * 0.06}px ${numFont}`; ctx.fillStyle = '#ff5a40';
+  ctx.shadowColor = 'rgba(255,36,23,0.6)'; ctx.shadowBlur = 12;
   const pos = (player.positions?.length ? player.positions : [player.pos]).join('·');
-  ctx.save(); ctx.shadowColor='#bb0000'; ctx.shadowBlur=14;
-  ctx.fillStyle='#ff5252'; ctx.font='900 18px system-ui,sans-serif';
-  ctx.fillText(pos, 18, 96); ctx.restore();
-
-  // 명예회원 배지
+  ctx.fillText(pos, W * 0.095, H * 0.075 + W * 0.145);
   if (player.honorary) {
-    ctx.save();
-    ctx.fillStyle='rgba(251,191,36,0.12)'; ctx.strokeStyle='rgba(251,191,36,0.4)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.roundRect(18, 104, 82, 18, 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle='#fbbf24'; ctx.font='900 11px system-ui,sans-serif';
-    ctx.fillText('★ 명예회원', 22, 117); ctx.restore();
+    ctx.shadowBlur = 0; ctx.font = `900 ${W * 0.032}px ${nameFont}`;
+    const y = H * 0.075 + W * 0.215;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.strokeStyle = 'rgba(251,191,36,0.4)';
+    ctx.beginPath(); ctx.roundRect(W * 0.095, y, W * 0.2, W * 0.045, 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fbbf24'; ctx.fillText('★ 명예회원', W * 0.11, y + W * 0.007);
   }
+  ctx.restore();
 
-  // TAES FC
-  ctx.save(); ctx.textAlign='right';
-  ctx.fillStyle='#ff5252'; ctx.font='900 19px system-ui,sans-serif'; ctx.fillText('TAES', W-16, 30);
-  ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.font='700 13px system-ui,sans-serif'; ctx.fillText('FC', W-16, 48);
-  ctx.textAlign='left'; ctx.restore();
+  // 이름 (받침 없이 그림자만)
+  const nameSize = W * (player.name.length > 4 ? 0.096 : 0.116);
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.font = `400 ${nameSize}px ${nameFont}`;
+  ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 5;
+  ctx.fillStyle = '#000'; ctx.fillText(player.name, W / 2, H * 0.49);
+  ctx.shadowColor = 'rgba(255,60,35,0.4)'; ctx.shadowBlur = 20; ctx.shadowOffsetY = 0;
+  ctx.fillStyle = chrome(H * 0.49, H * 0.49 + nameSize); ctx.fillText(player.name, W / 2, H * 0.49);
+  ctx.restore();
+  // 이름 밑선
+  const uy = H * 0.49 + nameSize * 1.16;
+  const ug = ctx.createLinearGradient(W * 0.26, 0, W * 0.74, 0);
+  ug.addColorStop(0, 'rgba(255,74,42,0)'); ug.addColorStop(0.22, '#ff4a2a'); ug.addColorStop(0.5, '#fff0ea');
+  ug.addColorStop(0.78, '#ff4a2a'); ug.addColorStop(1, 'rgba(255,74,42,0)');
+  ctx.save(); ctx.shadowColor = 'rgba(255,60,35,0.85)'; ctx.shadowBlur = 8;
+  ctx.fillStyle = ug; ctx.fillRect(W * 0.26, uy, W * 0.48, W * 0.005); ctx.restore();
 
-  // 구분선
-  const sepY = H * 0.795;
-  const sep = ctx.createLinearGradient(0, 0, W, 0);
-  sep.addColorStop(0,'transparent'); sep.addColorStop(0.1,'#7a0000');
-  sep.addColorStop(0.32,'#ff5252'); sep.addColorStop(0.5,'rgba(255,200,200,0.75)');
-  sep.addColorStop(0.68,'#ff5252'); sep.addColorStop(0.9,'#7a0000'); sep.addColorStop(1,'transparent');
-  ctx.strokeStyle=sep; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(0,sepY); ctx.lineTo(W,sepY); ctx.stroke();
-
-  // 이름
-  ctx.save(); ctx.textAlign='center'; ctx.shadowColor='rgba(187,0,0,0.5)'; ctx.shadowBlur=18;
-  ctx.fillStyle='#fff'; ctx.font='900 26px system-ui,sans-serif';
-  ctx.fillText(player.name, W/2, H*0.845); ctx.restore();
-
-  // No. 배지
+  // 등번호 판 (육각 금속 테두리)
   ctx.save();
-  ctx.fillStyle='rgba(187,0,0,0.12)'; ctx.strokeStyle='rgba(220,38,38,0.38)'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.roundRect((W-72)/2, H*0.858, 72, 22, 11); ctx.fill(); ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,0.38)'; ctx.font='700 13px system-ui,sans-serif'; ctx.textAlign='center';
-  ctx.fillText(`No.${player.no}`, W/2, H*0.858+15); ctx.restore();
+  ctx.font = `800 ${W * 0.064}px ${numFont}`;
+  const numW = ctx.measureText(String(player.no)).width;
+  ctx.font = `700 ${W * 0.039}px ${numFont}`;
+  const labW = ctx.measureText('No.').width;
+  const pw = numW + labW + W * 0.15 + W * 0.06, phh = W * 0.064 * 1.15 + W * 0.014;
+  const px = W / 2 - pw / 2, py = H * 0.575;
+  const plate = (x: number, y: number, w: number, h: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.06, y); ctx.lineTo(x + w * 0.94, y); ctx.lineTo(x + w, y + h / 2);
+    ctx.lineTo(x + w * 0.94, y + h); ctx.lineTo(x + w * 0.06, y + h); ctx.lineTo(x, y + h / 2); ctx.closePath();
+  };
+  ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+  const og = ctx.createLinearGradient(0, py, 0, py + phh);
+  og.addColorStop(0, '#ffd9d1'); og.addColorStop(0.26, '#ff6e52'); og.addColorStop(0.62, '#8e1105'); og.addColorStop(1, '#ffb3a2');
+  ctx.fillStyle = og; plate(px, py, pw, phh); ctx.fill();
+  ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  const ig = ctx.createLinearGradient(0, py, 0, py + phh);
+  ig.addColorStop(0, 'rgba(255,120,95,0.22)'); ig.addColorStop(0.42, 'rgba(10,4,5,0.96)'); ig.addColorStop(1, 'rgba(4,2,3,0.98)');
+  const b = W * 0.0042;
+  ctx.fillStyle = ig; plate(px + b, py + b, pw - b * 2, phh - b * 2); ctx.fill();
+  // 다이아몬드 + 글자
+  const dy = py + phh / 2, d = W * 0.0075;
+  const dg = ctx.createLinearGradient(0, dy - d, 0, dy + d);
+  dg.addColorStop(0, '#fff2ee'); dg.addColorStop(1, '#ff5a3c');
+  ctx.shadowColor = 'rgba(255,80,55,0.9)'; ctx.shadowBlur = 5;
+  for (const xx of [px + W * 0.075 + d, px + pw - W * 0.075 - d]) {
+    ctx.save(); ctx.translate(xx, dy); ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = dg; ctx.fillRect(-d, -d, d * 2, d * 2); ctx.restore();
+  }
+  ctx.shadowBlur = 0; ctx.textBaseline = 'alphabetic';
+  const baseY = py + phh * 0.5 + W * 0.064 * 0.36;
+  let tx = W / 2 - (labW + W * 0.012 + numW) / 2;
+  ctx.font = `700 ${W * 0.039}px ${numFont}`; ctx.fillStyle = '#cfd4da'; ctx.fillText('No.', tx, baseY);
+  tx += labW + W * 0.012;
+  ctx.font = `800 ${W * 0.064}px ${numFont}`; ctx.fillStyle = chrome(baseY - W * 0.064, baseY); ctx.fillText(String(player.no), tx, baseY);
+  ctx.restore();
 
-  // 스탯 그리드
+  // 능력치 (프레임 빈 칸 좌표)
   const statsArr = [
     {k:'PAC',v:player.stats.spd},{k:'SHO',v:player.stats.sht},{k:'PAS',v:player.stats.pas},
     {k:'DRI',v:player.stats.dri},{k:'DEF',v:player.stats.def},{k:'PHY',v:player.stats.phy},
   ];
-  const sy = H * 0.9, cw = W / 3;
   statsArr.forEach(({k,v},i) => {
-    const cx = (i%3)*cw + cw/2, cy = sy + Math.floor(i/3)*38;
-    ctx.save(); ctx.textAlign='center';
-    ctx.fillStyle = v>=80?'#4ade80':v>=65?'#facc15':'#f87171';
-    ctx.font='900 22px system-ui,sans-serif'; ctx.fillText(String(v), cx, cy);
-    ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='700 12px system-ui,sans-serif';
-    ctx.fillText(k, cx, cy+16); ctx.restore();
+    const [sx, sy] = STAT_SLOTS[i];
+    const cx = W * (sx + 24.8 / 2) / 100, cy = H * (sy + 9.4 / 2) / 100;
+    ctx.save(); ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1;
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = `800 ${W * 0.084}px ${numFont}`; ctx.fillStyle = chrome(cy - W * 0.07, cy + W * 0.005);
+    ctx.fillText(String(v), cx, cy + W * 0.008);
+    ctx.font = `700 ${W * 0.03}px ${numFont}`; ctx.fillStyle = '#9aa0a8';
+    ctx.fillText(k, cx, cy + W * 0.008 + W * 0.036);
+    ctx.restore();
   });
 
   return cvs;
@@ -233,6 +232,12 @@ type Player = {
   modelPhotoURL?: string | null;
 };
 
+// 프레임 그림에서 측정한 능력치 칸 좌표 (카드 대비 %)
+const STAT_SLOTS: [number, number][] = [
+  [10.3, 64.0], [37.7, 64.0], [65.0, 64.0],
+  [10.3, 75.8], [37.7, 75.8], [65.0, 75.8],
+];
+
 const posColors: Record<string, string> = { GK: '#7C3AED', DF: '#059669', MF: '#2563EB', FW: '#DC2626' };
 
 // ── 카드 테마 ──
@@ -260,7 +265,6 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
     { k: 'PAS', v: player.stats.pas }, { k: 'DRI', v: player.stats.dri },
     { k: 'DEF', v: player.stats.def }, { k: 'PHY', v: player.stats.phy },
   ];
-  const uid = player.id;
   // 카드마다 불빛 시작 위치를 어긋나게 (id 기반, 서버/클라이언트 동일)
   const beamDelay = (String(player.id).split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 4) + 1;
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -329,175 +333,63 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
         onMouseLeave={() => { handleMouseLeave(); if (hasBack && wrapRef.current) { wrapRef.current.style.transition = 'transform 0.5s'; wrapRef.current.style.transform = 'none'; } }}
         onClick={handleClick}
       >
-        {/* ══ 앞면 ══ */}
-        <div className="relative overflow-hidden"
-          style={{
-            aspectRatio: '3/4.2',
-            borderRadius: '14px',
-            background: `linear-gradient(155deg, ${T.mid} 0%, ${T.base} 50%, #000 100%)`,
-            backfaceVisibility: 'hidden',
-            boxShadow: `0 2px 0 ${T.border}, 0 16px 56px rgba(0,0,0,0.97), 0 0 28px ${T.glow}1a, inset 0 1px 0 rgba(255,255,255,0.05)`,
-          }}
-        >
-          {/* ── 테두리를 도는 불빛 ── */}
-          <div className={`card-beam d${beamDelay}`} aria-hidden />
+        {/* ══ 앞면: 프레임 그림 위에 사진·이름·등번호·능력치를 얹는다 ══ */}
+        <div className="fcard" style={{ backfaceVisibility: 'hidden' }}>
+          {/* 선수 사진 (프레임 가운데 창) */}
+          {photoSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="fcard__shot" src={photoSrc} alt={player.name} draggable={false} />
+          ) : (
+            <div className="fcard__noshot">#{player.no}</div>
+          )}
 
-          {/* ── SVG: 카본 파이버 + 센터 글로우 ── */}
-          <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-            <defs>
-              <pattern id={`cf-${uid}`} x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
-                <rect width="4" height="4" fill="transparent"/>
-                <rect x="0" y="0" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
-                <rect x="2" y="2" width="2" height="2" fill="rgba(255,255,255,0.028)" rx="0.3"/>
-                <rect x="0" y="0" width="2" height="0.7" fill="rgba(255,255,255,0.022)"/>
-                <rect x="2" y="2" width="2" height="0.7" fill="rgba(255,255,255,0.022)"/>
-              </pattern>
-              <radialGradient id={`cg-${uid}`} cx="50%" cy="38%" r="52%">
-                <stop offset="0%" stopColor={T.glow} stopOpacity="0.16"/>
-                <stop offset="100%" stopColor={T.glow} stopOpacity="0"/>
-              </radialGradient>
-            </defs>
-            <rect width="100%" height="100%" fill={`url(#cf-${uid})`}/>
-            <ellipse cx="50%" cy="38%" rx="58%" ry="48%" fill={`url(#cg-${uid})`}/>
-          </svg>
+          {/* 프레임 */}
+          <NextImage className="fcard__frame" src="/card-frame.png" alt="" aria-hidden fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1280px) 25vw, 220px" draggable={false} />
 
-          {/* ── 로고 워터마크 ── */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/taes-emblem.png" alt="" aria-hidden style={{
-            position: 'absolute', top: '50%', left: '50%',
-            transform: 'translate(-50%, -52%)',
-            width: '78%', pointerEvents: 'none',
-            opacity: 0.22, filter: 'grayscale(1) brightness(2)',
-            zIndex: 2,
-          }}/>
+          {/* OVR + 포지션 */}
+          <div className="fcard__ovr">
+            <span className="fcard__ovr-n">{ovr}</span>
+            <span className="fcard__ovr-pos">{(player.positions?.length ? player.positions : [player.pos]).join('·')}</span>
+            {player.honorary && <span className="fcard__hon">★ 명예회원</span>}
+          </div>
 
-          {/* ── 경사 광택 레이어 ── */}
-          <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: '14px',
-            background: 'linear-gradient(128deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.025) 28%, transparent 52%)',
-          }}/>
+          {/* 이름 */}
+          <h3 className={`fcard__name${player.name.length > 4 ? ' is-long' : ''}`}>{player.name}</h3>
 
-          {/* ── 홀로그래픽 포일 (마우스 따라 움직임) ── */}
+          {/* 등번호 판 */}
+          <div className="fcard__num">
+            <div className="fcard__num-in">
+              <i className="fcard__num-d" aria-hidden />
+              <span className="fcard__num-lab">No.</span>
+              <b className="fcard__num-n">{player.no}</b>
+              <i className="fcard__num-d" aria-hidden />
+            </div>
+          </div>
+
+          {/* 능력치: 프레임의 빈 칸 6개 */}
+          {stats.map(({ k, v }, i) => (
+            <div key={k} className="fcard__stat" style={{ left: `${STAT_SLOTS[i][0]}%`, top: `${STAT_SLOTS[i][1]}%` }}>
+              <span className="fcard__stat-v">{v}</span>
+              <span className="fcard__stat-k">{k}</span>
+            </div>
+          ))}
+
+          {/* 프레임을 따라 흐르는 빛 */}
+          <div className={`fcard__shine d${beamDelay}`} aria-hidden />
+
+          {/* 홀로그래픽 포일 / 글레어 (마우스 따라 움직임) */}
           <div ref={holoRef} style={{
-            position: 'absolute', inset: 0, borderRadius: '14px', pointerEvents: 'none', zIndex: 18,
-            opacity: 0, transition: 'opacity 0.3s',
-            mixBlendMode: 'screen',
+            position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 6,
+            opacity: 0, transition: 'opacity 0.3s', mixBlendMode: 'screen',
+            WebkitMask: 'url(/card-frame.png) center / 100% 100% no-repeat',
+            mask: 'url(/card-frame.png) center / 100% 100% no-repeat',
           }}/>
-          {/* ── 글레어 스팟 ── */}
           <div ref={glareRef} style={{
-            position: 'absolute', inset: 0, borderRadius: '14px', pointerEvents: 'none', zIndex: 19,
+            position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 7,
+            WebkitMask: 'url(/card-frame.png) center / 100% 100% no-repeat',
+            mask: 'url(/card-frame.png) center / 100% 100% no-repeat',
           }}/>
-
-          {/* ── 메탈릭 테두리 (1.5px 단선) ── */}
-          <div style={{
-            position: 'absolute', inset: 0, borderRadius: '14px', zIndex: 22, pointerEvents: 'none',
-            background: `linear-gradient(145deg, ${T.borderHi} 0%, rgba(255,255,255,0.55) 18%, ${T.accent} 38%, ${T.border} 62%, ${T.borderHi}44 85%, ${T.border} 100%)`,
-            padding: '1.5px',
-            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-            WebkitMaskComposite: 'xor', maskComposite: 'exclude',
-          }}/>
-
-          {/* ── 상단 액센트 라인 ── */}
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, height: 2, zIndex: 25, pointerEvents: 'none',
-            background: `linear-gradient(90deg, transparent, ${T.border} 12%, ${T.accent} 32%, rgba(255,180,180,0.9) 50%, ${T.accent} 68%, ${T.border} 88%, transparent)`,
-            borderRadius: '14px 14px 0 0',
-          }}/>
-
-          {/* ── 하단 글로우 ── */}
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: '45%', pointerEvents: 'none',
-            background: `radial-gradient(ellipse 75% 38% at 50% 100%, ${T.glow}30, transparent 70%)`,
-          }}/>
-
-          {/* ── OVR + 포지션 ── */}
-          <div style={{ position: 'absolute', top: 10, left: 11, zIndex: 15 }}>
-            <div style={{
-              fontSize: 28, fontWeight: 900, color: '#fff', lineHeight: 1,
-              textShadow: `0 0 14px ${T.glow}, 0 2px 8px rgba(0,0,0,0.9)`,
-            }}>{ovr}</div>
-            <div style={{
-              fontSize: 10, fontWeight: 900, color: T.bright, letterSpacing: '0.07em', marginTop: 2,
-              textShadow: `0 0 8px ${T.glow}`,
-            }}>{(player.positions ?? [player.pos]).join('·')}</div>
-            {player.honorary && (
-              <div style={{
-                marginTop: 5, fontSize: 6.5, fontWeight: 900, letterSpacing: '0.07em',
-                color: '#fbbf24', border: '1px solid #fbbf2466',
-                padding: '1.5px 4px', borderRadius: 2,
-                textShadow: '0 0 6px #d4a01780',
-              }}>★ 명예회원</div>
-            )}
-          </div>
-
-          {/* ── TAES FC ── */}
-          <div style={{ position: 'absolute', top: 10, right: 10, textAlign: 'right', zIndex: 15 }}>
-            <div style={{ fontSize: 10, fontWeight: 900, color: T.bright, letterSpacing: '0.12em', opacity: 0.85 }}>TAES</div>
-            <div style={{ fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.1em', marginTop: 1 }}>FC</div>
-          </div>
-
-          {/* ── 선수 사진 ── */}
-          <div style={{
-            position: 'absolute', bottom: '21%', left: '50%',
-            transform: 'translateX(-50%)',
-            width: '92%', height: '62%',
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-            zIndex: 10,
-          }}>
-            {photoSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photoSrc} alt={player.name} style={{
-                maxHeight: '100%', maxWidth: '100%', objectFit: 'contain',
-                filter: `drop-shadow(0 4px 18px rgba(0,0,0,0.95)) drop-shadow(0 0 10px ${T.glow}30)`,
-              }}/>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                <div style={{ fontSize: 36, fontWeight: 900, color: T.accent, opacity: 0.4,
-                  textShadow: `0 0 24px ${T.glow}` }}>#{player.no}</div>
-                <div style={{ fontSize: 20, opacity: 0.15, marginTop: 4 }}>⚽</div>
-              </div>
-            )}
-          </div>
-
-          {/* ── 하단 정보 패널 ── */}
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 15,
-            background: `linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.85) 55%, transparent 100%)`,
-            padding: '28px 10px 10px',
-            borderRadius: '0 0 14px 14px',
-          }}>
-            <div style={{
-              height: 1, marginBottom: 7,
-              background: `linear-gradient(to right, transparent, ${T.border} 10%, ${T.bright} 32%, ${T.sepMid} 50%, ${T.bright} 68%, ${T.border} 90%, transparent)`,
-              boxShadow: `0 0 5px ${T.glow}45`,
-            }}/>
-            <div style={{ textAlign: 'center', marginBottom: 7 }}>
-              <div style={{
-                fontSize: 13, fontWeight: 900, color: '#fff', letterSpacing: '0.05em',
-                textShadow: `0 0 12px ${T.glow}55, 0 1px 4px rgba(0,0,0,0.9)`,
-              }}>{player.name}</div>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 2,
-                marginTop: 3, padding: '2px 8px', borderRadius: 20,
-                background: `${T.glow}12`, border: `1px solid ${T.accent}38`,
-              }}>
-                <span style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.38)', letterSpacing: '0.06em' }}>No.</span>
-                <span style={{ fontSize: 12, fontWeight: 900, color: '#fff', textShadow: `0 0 8px ${T.glow}` }}>{player.no}</span>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '3px 2px' }}>
-              {stats.map(({ k, v }) => (
-                <div key={k} style={{ textAlign: 'center' }}>
-                  <div style={{
-                    fontSize: 12, fontWeight: 900, lineHeight: 1,
-                    color: v >= 80 ? '#4ade80' : v >= 65 ? '#facc15' : '#f87171',
-                    textShadow: '0 1px 4px rgba(0,0,0,0.9)',
-                  }}>{v}</div>
-                  <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.06em', marginTop: 1 }}>{k}</div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* ══ 뒷면 (로고) ══ */}
@@ -511,9 +403,6 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
               boxShadow: `0 2px 0 ${T.border}, 0 16px 56px rgba(0,0,0,0.97)`,
             }}
           >
-            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-              <rect width="100%" height="100%" fill={`url(#cf-${uid})`}/>
-            </svg>
             <div style={{
               position: 'absolute', inset: 0, borderRadius: '14px', pointerEvents: 'none',
               background: `linear-gradient(145deg, ${T.borderHi} 0%, rgba(255,255,255,0.55) 18%, ${T.accent} 38%, ${T.border} 62%, ${T.borderHi}44 85%, ${T.border} 100%)`,
@@ -921,7 +810,7 @@ function PlayersContent() {
             {/* 상세 보기 */}
             {selected && !showForm && (
               <div className="p-6 flex gap-6 flex-wrap">
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 w-[240px] max-w-full">
                   <FifaCard player={selected} onClick={() => {}} />
                 </div>
                 <div className="flex-1 min-w-[180px] flex flex-col justify-between">

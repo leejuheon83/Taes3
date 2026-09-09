@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_KR, Black_Han_Sans } from "next/font/google";
+import { Noto_Sans_KR, Black_Han_Sans, Saira_Condensed } from "next/font/google";
 import "./globals.css";
 
 // 본문용 한글 서체
@@ -16,6 +16,14 @@ const blackHanSans = Black_Han_Sans({
   weight: "400",
   display: "swap",
   variable: "--font-display",
+});
+
+// 선수 카드 숫자용 서체 (등번호·능력치)
+const sairaCondensed = Saira_Condensed({
+  subsets: ["latin"],
+  weight: ["700", "800"],
+  display: "swap",
+  variable: "--font-num",
 });
 import Navbar from "@/components/Navbar";
 import PWARegister from "@/components/PWARegister";
@@ -50,7 +58,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={`h-full ${notoSansKR.variable} ${blackHanSans.variable}`}>
+    <html lang="ko" className={`h-full ${notoSansKR.variable} ${blackHanSans.variable} ${sairaCondensed.variable}`}>
       <body className="min-h-full flex flex-col text-white antialiased" style={{ backgroundColor: '#080808' }}>
         <PWARegister />
         <MusicToggle />
