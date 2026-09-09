@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, orderBy, query, limit } from 'firebase/firestore';
 import { shotClass } from '@/lib/photo';
+import DragScroller from '@/components/DragScroller';
 
 type StaffCard = {
   id: string; name: string; role: string; career: string; order: number; photoURL: string | null;
@@ -501,10 +502,10 @@ export default function Home() {
                 전체보기 →
               </Link>
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <DragScroller fadeColor="#050505">
               {manager && <MiniStaffCard key={manager.id} s={manager} />}
               {players.map(p => <MiniCard key={p.id} p={p} />)}
-            </div>
+            </DragScroller>
           </div>
         </section>
       )}
