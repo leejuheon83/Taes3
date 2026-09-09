@@ -124,6 +124,22 @@ export default function GalleryPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
+  // ── 크게 보기 키보드: Esc 닫기, ←/→ 넘기기 ──
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => {
+      const isAllView = view === 'all' && !openAlbumId;
+      const total = isAllView
+        ? albums.reduce((n, a) => n + a.items.length, 0)
+        : albums.find(a => a.id === lightbox.albumId)?.items.length ?? 0;
+      if (e.key === 'Escape') setLightbox(null);
+      else if (e.key === 'ArrowLeft' && lightbox.itemIdx > 0) setLightbox({ ...lightbox, itemIdx: lightbox.itemIdx - 1 });
+      else if (e.key === 'ArrowRight' && lightbox.itemIdx < total - 1) setLightbox({ ...lightbox, itemIdx: lightbox.itemIdx + 1 });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightbox, view, openAlbumId, albums]);
+
   // ── 터치 스와이프 처리 ──
   function handleTouchStart(e: React.TouchEvent) {
     setTouchStart(e.touches[0].clientX);
@@ -514,7 +530,8 @@ export default function GalleryPage() {
                   const isLoading = imageLoading[item.id];
                   const thumbnailUrl = generateThumbnailUrl(item.url, 'small');
                   return (
-                  <div key={item.id} className="relative group aspect-square bg-white/5 rounded overflow-hidden">
+                  <div key={item.id} className="relative group aspect-square bg-white/5 rounded overflow-hidden cursor-pointer"
+                    onClick={() => setLightbox({ albumId: openAlbum.id, itemIdx: idx })}>
                     {isLoading && (
                       <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent animate-pulse" />
                     )}
@@ -523,9 +540,8 @@ export default function GalleryPage() {
                       src={thumbnailUrl}
                       alt={item.name}
                       loading="lazy"
-                      className="w-full h-full object-cover cursor-pointer border transition-all duration-300"
+                      className="w-full h-full object-cover border transition-all duration-300"
                       style={{ borderColor: isFeatured ? '#CC0000' : 'rgba(255,255,255,0.1)', opacity: isLoading ? 0.5 : 1 }}
-                      onClick={() => setLightbox({ albumId: openAlbum.id, itemIdx: idx })}
                       onLoad={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
                       onError={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
                     />
@@ -534,17 +550,18 @@ export default function GalleryPage() {
                         ★ 메인
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 z-10">
+                    {/* 관리 버튼 덮개 — 버튼만 클릭을 받고 나머지는 사진 클릭으로 통과시킨다 */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 z-10 pointer-events-none">
                       <button
                         onClick={(e) => { e.stopPropagation(); requireAdmin(() => handleSetFeatured(item)); }}
-                        className="px-2 py-1 text-[10px] font-black text-white transition-colors"
+                        className="pointer-events-auto px-2 py-1 text-[10px] font-black text-white transition-colors"
                         style={{ backgroundColor: isFeatured ? '#666' : '#CC0000' }}
                       >
                         {isFeatured ? '✓ 메인 설정됨' : '★ 메인으로 설정'}
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteItem(openAlbum.id, item.id); }}
-                        className="px-2 py-1 text-[10px] font-bold text-white/70 hover:text-white bg-black/60 hover:bg-red-900 transition-colors"
+                        className="pointer-events-auto px-2 py-1 text-[10px] font-bold text-white/70 hover:text-white bg-black/60 hover:bg-red-900 transition-colors"
                       >
                         삭제
                       </button>
@@ -865,13 +882,14 @@ export default function GalleryPage() {
               </button>
             )}
 
-            <div className="max-w-5xl w-full px-4 sm:px-16" onClick={e => e.stopPropagation()}>
+            <div className="w-full h-full flex items-center justify-center px-2 sm:px-16 py-12" onClick={e => e.stopPropagation()}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.url}
                 alt={item.name}
-                className="max-h-[85vh] mx-auto object-contain"
-                style={{ maxHeight: '85vh', maxWidth: '100%' }}
+                className="object-contain select-none"
+                style={{ maxHeight: '100%', maxWidth: '100%', boxShadow: '0 20px 80px rgba(0,0,0,0.8)' }}
+                draggable={false}
                 onLoad={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
                 onError={() => setImageLoading(prev => ({ ...prev, [item.id]: false }))}
               />

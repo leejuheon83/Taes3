@@ -180,6 +180,19 @@ export default function Home() {
   const [players, setPlayers] = useState<PlayerCard[]>([]);
   const [manager, setManager] = useState<StaffCard | null>(null);
   const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
+  const [photoView, setPhotoView] = useState<number | null>(null);   // 크게 보는 사진 번호
+
+  // 사진 크게 보기: Esc 닫기, ←/→ 넘기기
+  useEffect(() => {
+    if (photoView === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPhotoView(null);
+      else if (e.key === 'ArrowLeft' && photoView > 0) setPhotoView(photoView - 1);
+      else if (e.key === 'ArrowRight' && photoView < galleryPhotos.length - 1) setPhotoView(photoView + 1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [photoView, galleryPhotos.length]);
 
   useEffect(() => {
     async function loadData() {
@@ -667,13 +680,14 @@ export default function Home() {
               <div className="grid grid-cols-3 gap-1.5">
                 {galleryPhotos.length > 0
                   ? galleryPhotos.map((url, i) => (
-                    <Link key={i} href="/gallery"
-                      className="aspect-square overflow-hidden group relative block"
-                      style={{ backgroundColor: '#0e0e0e' }}>
+                    <button key={i} type="button" onClick={() => setPhotoView(i)}
+                      aria-label={`사진 ${i + 1} 크게 보기`}
+                      className="aspect-square overflow-hidden group relative block w-full p-0 border-0 cursor-zoom-in"
+                      style={{ backgroundColor: '#0e0e0e', minHeight: 0 }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={url} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"/>
                       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: 'rgba(204,0,0,0.25)' }}/>
-                    </Link>
+                    </button>
                   ))
                   : Array.from({ length: 6 }).map((_, i) => (
                     <Link key={i} href="/gallery"
@@ -689,6 +703,33 @@ export default function Home() {
         </div>
       </div>
 
+      {/* ─── 사진 크게 보기 ─── */}
+      {photoView !== null && galleryPhotos[photoView] && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.97)' }}
+          onClick={() => setPhotoView(null)}>
+          <button className="absolute top-3 right-3 sm:top-4 sm:right-4 text-white/60 hover:text-white text-2xl z-10 p-2"
+            style={{ minHeight: 0 }} aria-label="닫기" onClick={() => setPhotoView(null)}>✕</button>
+          <Link href="/gallery" onClick={e => e.stopPropagation()}
+            className="absolute top-4 left-4 z-10 px-3 py-2 text-xs sm:text-sm font-bold text-white/80 hover:text-white border border-white/20 hover:border-white/50 transition-colors"
+            style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}>
+            갤러리 전체 보기 →
+          </Link>
+          {photoView > 0 && (
+            <button className="absolute left-2 sm:left-6 text-white/60 hover:text-white text-4xl sm:text-5xl z-10 p-3" style={{ minHeight: 0 }}
+              aria-label="이전 사진" onClick={e => { e.stopPropagation(); setPhotoView(photoView - 1); }}>‹</button>
+          )}
+          <div className="w-full h-full flex items-center justify-center px-2 sm:px-16 py-12" onClick={e => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={galleryPhotos[photoView]} alt="" draggable={false} className="object-contain select-none"
+              style={{ maxHeight: '100%', maxWidth: '100%', boxShadow: '0 20px 80px rgba(0,0,0,0.8)' }}/>
+          </div>
+          {photoView < galleryPhotos.length - 1 && (
+            <button className="absolute right-2 sm:right-6 text-white/60 hover:text-white text-4xl sm:text-5xl z-10 p-3" style={{ minHeight: 0 }}
+              aria-label="다음 사진" onClick={e => { e.stopPropagation(); setPhotoView(photoView + 1); }}>›</button>
+          )}
+          <div className="absolute bottom-4 text-white/30 text-xs sm:text-sm select-none">{photoView + 1} / {galleryPhotos.length}</div>
+        </div>
+      )}
     </div>
   );
 }
