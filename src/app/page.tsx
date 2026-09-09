@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, orderBy, query, limit } from 'firebase/firestore';
+import { shotClass } from '@/lib/photo';
 
 type StaffCard = {
   id: string; name: string; role: string; career: string; order: number; photoURL: string | null;
@@ -18,7 +19,8 @@ const STAT_SLOTS: [number, number][] = [
 ];
 
 function MiniStaffCard({ s }: { s: StaffCard }) {
-  const cls = s.role.includes('감독') ? 'fcard--gold'
+  const isManager = s.role.includes('감독');   // 감독은 전용 프레임 그림
+  const cls = isManager ? 'fcard--manager'
     : s.role.includes('골키퍼') ? 'fcard--green'
     : s.role.includes('피지컬') ? 'fcard--purple'
     : s.role.includes('코치') ? 'fcard--blue' : '';
@@ -29,15 +31,17 @@ function MiniStaffCard({ s }: { s: StaffCard }) {
       <div className={`fcard ${cls} mini-card`}>
         {s.photoURL ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="fcard__shot is-photo" src={s.photoURL} alt={s.name} draggable={false} />
+          <img className={shotClass(s.photoURL)} src={s.photoURL} alt={s.name} draggable={false} />
         ) : (
           <div className="fcard__noshot">{s.name.charAt(0)}</div>
         )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="fcard__frame" src={frame} alt="" aria-hidden draggable={false} />
-        <div className="fcard__ovr">
-          <span className="fcard__ovr-n is-word">{s.role}</span>
-        </div>
+        {!isManager && (
+          <div className="fcard__ovr">
+            <span className="fcard__ovr-n is-word">{s.role}</span>
+          </div>
+        )}
         <h3 className={`fcard__name${s.name.length > 4 ? ' is-long' : ''}`}>{s.name}</h3>
         <div className="fcard__num">
           <div className="fcard__num-in">
@@ -47,7 +51,9 @@ function MiniStaffCard({ s }: { s: StaffCard }) {
             <i className="fcard__num-d" aria-hidden />
           </div>
         </div>
-        {career && (
+        {career && (isManager ? (
+          <div className="fcard__note"><div>{career}</div></div>
+        ) : (
           <>
             <div className="fcard__note" style={{ top: '64%', height: '9.4%' }}>
               <span className="fcard__note-lab" style={{ margin: 0 }}>CAREER</span>
@@ -56,7 +62,7 @@ function MiniStaffCard({ s }: { s: StaffCard }) {
               <div>{career}</div>
             </div>
           </>
-        )}
+        ))}
         <div className="fcard__shine d3" aria-hidden />
       </div>
     </Link>
@@ -82,7 +88,7 @@ function MiniCard({ p }: { p: PlayerCard }) {
       <div className="fcard mini-card">
         {photo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="fcard__shot" src={photo} alt={p.name} draggable={false} />
+          <img className={shotClass(photo)} src={photo} alt={p.name} draggable={false} />
         ) : (
           <div className="fcard__noshot">#{p.no}</div>
         )}

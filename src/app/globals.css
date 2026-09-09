@@ -355,9 +355,9 @@ body {
   container-type: inline-size;
   filter: drop-shadow(0 0 16px rgba(var(--fc-glow), 0.26)) drop-shadow(0 14px 26px rgba(0, 0, 0, 0.75));
 }
-/* 감독 카드 — 같은 프레임, 금색 */
-.fcard--gold {
-  --fc-frame: url('/card-frame-gold.webp');
+/* 감독 카드 — 감독 전용 프레임 그림 (역할 글자·엠블럼이 그림에 들어있고 능력치 칸이 없다) */
+.fcard--manager {
+  --fc-frame: url('/card-frame-manager.webp');
   --fc-glow: 245, 184, 0;
   --fc-accent: #ffcb4a;
   --fc-line: #ffc21f;
@@ -366,7 +366,15 @@ body {
   --fc-plate-2: #ffc861;
   --fc-plate-3: #6d4a00;
   --fc-plate-4: #ffdfa4;
+  aspect-ratio: 989 / 1293;
 }
+/* 능력치 칸이 없어 가운데가 넓다 — 사진과 글자를 그 비율에 맞춘다 */
+.fcard--manager .fcard__shot   { left: 12%; width: 76%; top: 20%; height: 50%; }
+.fcard--manager .fcard__noshot { top: 26%; height: 38%; }
+.fcard--manager .fcard__name   { top: 56%; }
+.fcard--manager .fcard__num    { top: 68%; }
+.fcard--manager .fcard__note   { top: 76.5%; height: 7%; }
+
 /* 코치 카드 색 */
 .fcard--blue {
   --fc-frame: url('/card-frame-blue.webp');

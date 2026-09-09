@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, orderBy, query } from 'firebase/firestore';
+import { shotClass } from '@/lib/photo';
 
 // ── 이미지 압축 ──
 function compressImage(file: File, maxDim = 500, quality = 0.85): Promise<string> {
@@ -39,7 +40,7 @@ type Staff = {
 
 // ── 역할별 색 (프레임 그림은 같고 색만 다르다) ──
 const ROLES: Record<string, { cls: string; label: string }> = {
-  '감독':       { cls: 'fcard--gold',   label: 'MANAGER' },
+  '감독':       { cls: 'fcard--manager', label: 'MANAGER' },
   '골키퍼코치': { cls: 'fcard--green',  label: 'GK COACH' },
   '피지컬코치': { cls: 'fcard--purple', label: 'PHYSICAL' },
   '코치':       { cls: 'fcard--blue',   label: 'COACH' },
@@ -59,6 +60,7 @@ function StaffCard({ staff, onEdit, onDelete }: {
   staff: Staff; onEdit: () => void; onDelete: () => void;
 }) {
   const r = getRole(staff.role);
+  const isManager = staff.role.includes('감독');   // 감독은 전용 프레임 그림을 쓴다
   const careerLines = staff.career.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 3);
   const shine = (staff.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 4) + 1;
 
@@ -68,7 +70,7 @@ function StaffCard({ staff, onEdit, onDelete }: {
         {/* 사진 */}
         {staff.photoURL ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="fcard__shot is-photo" src={staff.photoURL} alt={staff.name} draggable={false} />
+          <img className={shotClass(staff.photoURL)} src={staff.photoURL} alt={staff.name} draggable={false} />
         ) : (
           <div className="fcard__noshot">{staff.name.charAt(0)}</div>
         )}
@@ -77,11 +79,13 @@ function StaffCard({ staff, onEdit, onDelete }: {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="fcard__frame" src={frameSrc(r.cls)} alt="" aria-hidden draggable={false} />
 
-        {/* 왼쪽 위: 역할 */}
-        <div className="fcard__ovr">
-          <span className="fcard__ovr-n is-word">{staff.role}</span>
-          <span className={`fcard__ovr-pos${r.label.length > 5 ? ' is-long' : ''}`}>{r.label}</span>
-        </div>
+        {/* 왼쪽 위: 역할 — 감독 프레임에는 그림에 이미 들어있다 */}
+        {!isManager && (
+          <div className="fcard__ovr">
+            <span className="fcard__ovr-n is-word">{staff.role}</span>
+            <span className={`fcard__ovr-pos${r.label.length > 5 ? ' is-long' : ''}`}>{r.label}</span>
+          </div>
+        )}
 
         {/* 이름 */}
         <h3 className={`fcard__name${staff.name.length > 4 ? ' is-long' : ''}`}>{staff.name}</h3>
@@ -96,8 +100,14 @@ function StaffCard({ staff, onEdit, onDelete }: {
           </div>
         </div>
 
-        {/* 능력치 칸 자리에 경력 — 칸 두 줄에 정확히 맞춘다 */}
-        {careerLines.length === 1 ? (
+        {/* 경력 — 감독 프레임은 아래가 트여 있어 한 덩이로 넣는다 */}
+        {isManager ? (
+          careerLines.length > 0 && (
+            <div className="fcard__note">
+              <div>{careerLines.map((line, i) => <div key={i}>{line}</div>)}</div>
+            </div>
+          )
+        ) : careerLines.length === 1 ? (
           <>
             <div className="fcard__note" style={{ top: '64%', height: '9.4%' }}>
               <span className="fcard__note-lab" style={{ margin: 0 }}>CAREER</span>

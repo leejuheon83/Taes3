@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import NextImage from 'next/image';
+import { shotClass, hasCutoutBackground } from '@/lib/photo';
 import { useAdminAuth } from '@/components/AdminAuth';
 import SearchPlayerCard from '@/components/SearchPlayerCard';
 import { db } from '@/lib/firebase';
@@ -44,16 +45,31 @@ async function generateCardCanvas(player: Player): Promise<HTMLCanvasElement> {
       const tmp = document.createElement('canvas');
       tmp.width = W; tmp.height = H;
       const t = tmp.getContext('2d')!;
-      const sc = Math.min(win.w / ph.width, win.h / ph.height);   // contain
-      const dw = ph.width * sc, dh = ph.height * sc;
-      const dx = win.x + (win.w - dw) / 2, dy = win.y + (win.h - dh);  // 아래 정렬
-      t.drawImage(ph, dx, dy, dw, dh);
-      // 아래쪽만 서서히 사라지게
-      t.globalCompositeOperation = 'destination-in';
-      const m = t.createLinearGradient(0, win.y, 0, win.y + win.h);
-      m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.76, 'rgba(0,0,0,1)');
-      m.addColorStop(0.91, 'rgba(0,0,0,0.5)'); m.addColorStop(1, 'rgba(0,0,0,0)');
-      t.fillStyle = m; t.fillRect(0, win.y, W, win.h);
+      const cut = hasCutoutBackground(photoSrc);
+      if (cut) {
+        // 배경을 지운 사진: 잘라내지 않고 창에 맞춰 아래로 붙인다
+        const sc = Math.min(win.w / ph.width, win.h / ph.height);
+        const dw = ph.width * sc, dh = ph.height * sc;
+        t.drawImage(ph, win.x + (win.w - dw) / 2, win.y + (win.h - dh), dw, dh);
+        t.globalCompositeOperation = 'destination-in';
+        const m = t.createLinearGradient(0, win.y, 0, win.y + win.h);
+        m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.76, 'rgba(0,0,0,1)');
+        m.addColorStop(0.91, 'rgba(0,0,0,0.5)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+        t.fillStyle = m; t.fillRect(0, win.y, W, win.h);
+      } else {
+        // 배경이 있는 사진: 창에 맞춰 가운데 두고 가장자리를 타원으로 흐린다
+        const sc = Math.min(win.w / ph.width, win.h / ph.height);
+        const dw = ph.width * sc, dh = ph.height * sc;
+        t.drawImage(ph, win.x + (win.w - dw) / 2, win.y + (win.h - dh) / 2, dw, dh);
+        t.globalCompositeOperation = 'destination-in';
+        const cx = win.x + win.w / 2, cy = win.y + win.h / 2;
+        const rx = win.w * 0.42, ry = win.h * 0.48;
+        t.save(); t.translate(cx, cy); t.scale(1, ry / rx);
+        const m = t.createRadialGradient(0, 0, 0, 0, 0, rx);
+        m.addColorStop(0.76, 'rgba(0,0,0,1)'); m.addColorStop(0.92, 'rgba(0,0,0,0.55)');
+        m.addColorStop(1, 'rgba(0,0,0,0)');
+        t.fillStyle = m; t.fillRect(-W, -H * 2, W * 2, H * 4); t.restore();
+      }
       ctx.drawImage(tmp, 0, 0);
     } catch { /* ignore */ }
   } else {
@@ -334,7 +350,7 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
           {/* 선수 사진 (프레임 가운데 창) */}
           {photoSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img className="fcard__shot" src={photoSrc} alt={player.name} draggable={false} />
+            <img className={shotClass(photoSrc)} src={photoSrc} alt={player.name} draggable={false} />
           ) : (
             <div className="fcard__noshot">#{player.no}</div>
           )}
