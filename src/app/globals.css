@@ -337,12 +337,69 @@ body {
   .music-toggle { right: 12px; bottom: 12px; padding: 8px 11px; }
 }
 
-/* ── 선수 카드 (프레임 그림 기반) ── */
+/* ── 카드 (프레임 그림 기반) ── */
+/* 색은 변수로만 바꾼다: 프레임 그림 + 강조색 한 벌 */
 .fcard {
+  --fc-frame: url('/card-frame.webp');
+  --fc-glow: 255, 36, 23;
+  --fc-accent: #ff5a40;
+  --fc-line: #ff4a2a;
+  --fc-line-hi: #fff0ea;
+  --fc-plate-1: #ffd9d1;
+  --fc-plate-2: #ff6e52;
+  --fc-plate-3: #8e1105;
+  --fc-plate-4: #ffb3a2;
+
   position: relative;
   aspect-ratio: 1086 / 1448;
   container-type: inline-size;
-  filter: drop-shadow(0 0 16px rgba(255, 36, 23, 0.26)) drop-shadow(0 14px 26px rgba(0, 0, 0, 0.75));
+  filter: drop-shadow(0 0 16px rgba(var(--fc-glow), 0.26)) drop-shadow(0 14px 26px rgba(0, 0, 0, 0.75));
+}
+/* 감독 카드 — 같은 프레임, 금색 */
+.fcard--gold {
+  --fc-frame: url('/card-frame-gold.webp');
+  --fc-glow: 245, 184, 0;
+  --fc-accent: #ffcb4a;
+  --fc-line: #ffc21f;
+  --fc-line-hi: #fff6e2;
+  --fc-plate-1: #fff1d0;
+  --fc-plate-2: #ffc861;
+  --fc-plate-3: #6d4a00;
+  --fc-plate-4: #ffdfa4;
+}
+/* 코치 카드 색 */
+.fcard--blue {
+  --fc-frame: url('/card-frame-blue.webp');
+  --fc-glow: 59, 130, 246;
+  --fc-accent: #8ec2ff;
+  --fc-line: #3b82f6;
+  --fc-line-hi: #eaf3ff;
+  --fc-plate-1: #d6e8ff;
+  --fc-plate-2: #5aa2ff;
+  --fc-plate-3: #06306e;
+  --fc-plate-4: #a8ccff;
+}
+.fcard--green {
+  --fc-frame: url('/card-frame-green.webp');
+  --fc-glow: 34, 197, 94;
+  --fc-accent: #7fe6a4;
+  --fc-line: #22c55e;
+  --fc-line-hi: #eafff1;
+  --fc-plate-1: #d3ffe2;
+  --fc-plate-2: #46d97c;
+  --fc-plate-3: #04441f;
+  --fc-plate-4: #a6f0c2;
+}
+.fcard--purple {
+  --fc-frame: url('/card-frame-purple.webp');
+  --fc-glow: 192, 38, 211;
+  --fc-accent: #e693ff;
+  --fc-line: #c026d3;
+  --fc-line-hi: #fbeaff;
+  --fc-plate-1: #f6d9ff;
+  --fc-plate-2: #d764ec;
+  --fc-plate-3: #4b0a56;
+  --fc-plate-4: #e7b0f5;
 }
 .fcard__frame {
   position: absolute; inset: 0; z-index: 2;
@@ -351,7 +408,7 @@ body {
   pointer-events: none;
   user-select: none;
 }
-/* 선수 사진: 프레임 가운데 창에만 보이게 */
+/* 사진: 프레임 가운데 창에만 보이게 */
 .fcard__shot {
   position: absolute;
   left: 13%; width: 74%;
@@ -368,11 +425,11 @@ body {
   left: 13%; width: 74%; top: 22%; height: 36%;
   display: grid; place-content: center;
   font-family: var(--font-num), sans-serif; font-weight: 800;
-  font-size: 22cqw; color: rgba(255, 74, 42, 0.35);
-  text-shadow: 0 0 6cqw rgba(255, 36, 23, 0.5);
+  font-size: 22cqw; color: rgba(var(--fc-glow), 0.45);
+  text-shadow: 0 0 6cqw rgba(var(--fc-glow), 0.5);
   pointer-events: none;
 }
-/* 프레임 위 글자 공통 */
+/* 왼쪽 위: 종합 능력치 / 감독 표시 */
 .fcard__ovr {
   position: absolute; z-index: 4;
   left: 9.5%; top: 7.5%;
@@ -387,11 +444,18 @@ body {
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,.85));
 }
+/* 숫자 대신 한글(감독 등)이 들어갈 때 */
+.fcard__ovr-n.is-word {
+  font-family: var(--font-display), var(--font-body), sans-serif; font-weight: 400;
+  font-size: 11.5cqw; line-height: .95; letter-spacing: -.02em;
+}
 .fcard__ovr-pos {
   font-family: var(--font-num), sans-serif; font-weight: 800;
-  font-size: 6cqw; letter-spacing: .02em; color: #ff5a40;
-  text-shadow: 0 1px 4px rgba(0,0,0,.9), 0 0 12px rgba(255,36,23,.6);
+  font-size: 6cqw; letter-spacing: .02em; color: var(--fc-accent);
+  text-shadow: 0 1px 4px rgba(0,0,0,.9), 0 0 12px rgba(var(--fc-glow), .6);
 }
+/* MANAGER처럼 긴 라벨은 사진 창을 침범하지 않게 줄인다 */
+.fcard__ovr-pos.is-long { font-size: 4.3cqw; letter-spacing: .04em; }
 .fcard__hon {
   margin-top: 1.4cqw;
   font-size: 3.2cqw; font-weight: 900; letter-spacing: .06em;
@@ -416,7 +480,7 @@ body {
     drop-shadow(0 0.22cqw 0.3cqw rgba(0,0,0,1))
     drop-shadow(0 0.7cqw 1.5cqw rgba(0,0,0,.98))
     drop-shadow(0 0 2.2cqw rgba(0,0,0,.9))
-    drop-shadow(0 0 2.8cqw rgba(255,60,35,.4));
+    drop-shadow(0 0 2.8cqw rgba(var(--fc-glow), .4));
   pointer-events: none;
 }
 .fcard__name.is-long { font-size: 9.6cqw; }
@@ -425,8 +489,8 @@ body {
   position: absolute;
   left: 26%; right: 26%; bottom: -14%;
   height: 0.5cqw; border-radius: 1px;
-  background: linear-gradient(90deg, transparent, #ff4a2a 22%, #fff0ea 50%, #ff4a2a 78%, transparent);
-  box-shadow: 0 0 8px rgba(255,60,35,.85);
+  background: linear-gradient(90deg, transparent, var(--fc-line) 22%, var(--fc-line-hi) 50%, var(--fc-line) 78%, transparent);
+  box-shadow: 0 0 8px rgba(var(--fc-glow), .85);
   opacity: .85;
 }
 /* 등번호 판: 프레임과 같은 금속 이중 테두리 */
@@ -437,22 +501,22 @@ body {
   transform: translateX(-50%);
   padding: 0.42cqw;
   clip-path: var(--plate);
-  background: linear-gradient(180deg, #ffd9d1 0%, #ff6e52 26%, #8e1105 62%, #ffb3a2 100%);
-  filter: drop-shadow(0 0.5cqw 1.2cqw rgba(0,0,0,.85)) drop-shadow(0 0 1cqw rgba(255,60,35,.5));
+  background: linear-gradient(180deg, var(--fc-plate-1) 0%, var(--fc-plate-2) 26%, var(--fc-plate-3) 62%, var(--fc-plate-4) 100%);
+  filter: drop-shadow(0 0.5cqw 1.2cqw rgba(0,0,0,.85)) drop-shadow(0 0 1cqw rgba(var(--fc-glow), .5));
   pointer-events: none;
 }
 .fcard__num-in {
   clip-path: var(--plate);
-  background: linear-gradient(180deg, rgba(255,120,95,.22) 0%, rgba(10,4,5,.96) 42%, rgba(4,2,3,.98) 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,.14) 0%, rgba(10,6,4,.96) 42%, rgba(4,3,2,.98) 100%);
   padding: 0.7cqw 7.5cqw;
   display: flex; align-items: baseline; justify-content: center; gap: 1.2cqw;
 }
 .fcard__num-d {
   align-self: center; display: block;
   width: 1.5cqw; height: 1.5cqw;
-  background: linear-gradient(180deg, #fff2ee, #ff5a3c);
+  background: linear-gradient(180deg, var(--fc-line-hi), var(--fc-line));
   transform: rotate(45deg);
-  box-shadow: 0 0 5px rgba(255,80,55,.9);
+  box-shadow: 0 0 5px rgba(var(--fc-glow), .9);
 }
 .fcard__num-lab {
   font-family: var(--font-num), sans-serif; font-weight: 700;
@@ -483,22 +547,42 @@ body {
   font-family: var(--font-num), sans-serif; font-weight: 700;
   font-size: 3cqw; letter-spacing: .16em; color: #9aa0a8;
 }
-/* 프레임 모양을 따라 흐르는 빛 (프레임 그림을 마스크로 사용) */
+/* 능력치가 없는 카드(감독)에서 빈 칸 자리에 넣는 한 줄 */
+.fcard__note {
+  position: absolute; z-index: 4;
+  left: 9%; right: 9%;
+  display: grid; place-items: center;
+  text-align: center; text-wrap: balance;
+  font-size: 4.1cqw; line-height: 1.3; font-weight: 700;
+  letter-spacing: -.01em;
+  color: #e9ebee;
+  text-shadow: 0 0.2cqw 0.5cqw rgba(0,0,0,1), 0 0 1.6cqw rgba(0,0,0,.95);
+  pointer-events: none;
+}
+.fcard__note-lab {
+  display: block;
+  font-family: var(--font-num), sans-serif; font-weight: 700;
+  font-size: 2.9cqw; letter-spacing: .18em;
+  color: var(--fc-accent);
+  margin-bottom: 0.8cqw;
+  text-shadow: 0 1px 3px rgba(0,0,0,.95);
+}
+/* 프레임 모양을 따라 흐르는 빛 */
 .fcard__shine {
   position: absolute; inset: 0; z-index: 5;
   pointer-events: none; overflow: hidden;
   mix-blend-mode: plus-lighter;
-  -webkit-mask: url('/card-frame.png') center / 100% 100% no-repeat;
-  mask: url('/card-frame.png') center / 100% 100% no-repeat;
+  -webkit-mask: var(--fc-frame) center / 100% 100% no-repeat;
+  mask: var(--fc-frame) center / 100% 100% no-repeat;
 }
 .fcard__shine::before {
   content: '';
   position: absolute; top: -20%; bottom: -20%; width: 46%;
   background: linear-gradient(105deg,
     transparent 0%,
-    rgba(255, 150, 120, 0.10) 35%,
-    rgba(255, 235, 225, 0.30) 50%,
-    rgba(255, 150, 120, 0.10) 65%,
+    rgba(255, 220, 190, 0.10) 35%,
+    rgba(255, 245, 235, 0.30) 50%,
+    rgba(255, 220, 190, 0.10) 65%,
     transparent 100%);
   animation: fcard-shine 4.2s linear infinite;
 }

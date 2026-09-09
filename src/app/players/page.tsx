@@ -67,7 +67,7 @@ async function generateCardCanvas(player: Player): Promise<HTMLCanvasElement> {
   }
 
   // 프레임
-  try { ctx.drawImage(await loadImg('/card-frame.png'), 0, 0, W, H); } catch { /* ignore */ }
+  try { ctx.drawImage(await loadImg('/card-frame.webp'), 0, 0, W, H); } catch { /* ignore */ }
 
   const chrome = (y0: number, y1: number) => {
     const g = ctx.createLinearGradient(0, y0, 0, y1);
@@ -344,7 +344,7 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
           )}
 
           {/* 프레임 */}
-          <NextImage className="fcard__frame" src="/card-frame.png" alt="" aria-hidden fill
+          <NextImage className="fcard__frame" src="/card-frame.webp" alt="" aria-hidden fill
             sizes="(max-width: 640px) 50vw, (max-width: 1280px) 25vw, 220px" draggable={false} />
 
           {/* OVR + 포지션 */}
@@ -382,13 +382,13 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
           <div ref={holoRef} style={{
             position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 6,
             opacity: 0, transition: 'opacity 0.3s', mixBlendMode: 'screen',
-            WebkitMask: 'url(/card-frame.png) center / 100% 100% no-repeat',
-            mask: 'url(/card-frame.png) center / 100% 100% no-repeat',
+            WebkitMask: 'var(--fc-frame) center / 100% 100% no-repeat',
+            mask: 'var(--fc-frame) center / 100% 100% no-repeat',
           }}/>
           <div ref={glareRef} style={{
             position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 7,
-            WebkitMask: 'url(/card-frame.png) center / 100% 100% no-repeat',
-            mask: 'url(/card-frame.png) center / 100% 100% no-repeat',
+            WebkitMask: 'var(--fc-frame) center / 100% 100% no-repeat',
+            mask: 'var(--fc-frame) center / 100% 100% no-repeat',
           }}/>
         </div>
 

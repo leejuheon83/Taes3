@@ -37,211 +37,108 @@ type Staff = {
   photoURL: string | null;
 };
 
-const THEMES: Record<string, { bg: string; glow: string; accent: string; border1: string; border2: string; label: string }> = {
-  '감독': {
-    bg: 'linear-gradient(170deg,#0d0800 0%,#1c1000 35%,#100800 65%,#030303 100%)',
-    glow: '#f5b800', accent: '#ffe066', border1: '#ffe066', border2: '#a86800',
-    label: 'MANAGER',
-  },
-  '코치': {
-    bg: 'linear-gradient(170deg,#00050f 0%,#000b1c 35%,#000810 65%,#030303 100%)',
-    glow: '#3b82f6', accent: '#93c5fd', border1: '#93c5fd', border2: '#1d4ed8',
-    label: 'COACH',
-  },
-  '골키퍼코치': {
-    bg: 'linear-gradient(170deg,#00090a 0%,#001510 35%,#000d08 65%,#030303 100%)',
-    glow: '#22c55e', accent: '#86efac', border1: '#86efac', border2: '#15803d',
-    label: 'GK COACH',
-  },
-  '피지컬코치': {
-    bg: 'linear-gradient(170deg,#080008 0%,#120010 35%,#090006 65%,#030303 100%)',
-    glow: '#c026d3', accent: '#e879f9', border1: '#e879f9', border2: '#86198f',
-    label: 'PHYSICAL',
-  },
+// ── 역할별 색 (프레임 그림은 같고 색만 다르다) ──
+const ROLES: Record<string, { cls: string; label: string }> = {
+  '감독':       { cls: 'fcard--gold',   label: 'MANAGER' },
+  '골키퍼코치': { cls: 'fcard--green',  label: 'GK COACH' },
+  '피지컬코치': { cls: 'fcard--purple', label: 'PHYSICAL' },
+  '코치':       { cls: 'fcard--blue',   label: 'COACH' },
 };
-const DEFAULT_THEME = {
-  bg: 'linear-gradient(170deg,#0a0000 0%,#1a0000 35%,#0a0000 65%,#030303 100%)',
-  glow: '#ef4444', accent: '#fca5a5', border1: '#fca5a5', border2: '#991b1b',
-  label: 'STAFF',
-};
+const DEFAULT_ROLE = { cls: '', label: 'STAFF' };
 
-function getTheme(role: string) {
-  for (const key of Object.keys(THEMES)) {
-    if (role.includes(key)) return THEMES[key];
+function getRole(role: string) {
+  // '골키퍼코치'가 '코치'보다 먼저 걸리도록 긴 이름부터 확인한다
+  for (const key of Object.keys(ROLES).sort((x, y) => y.length - x.length)) {
+    if (role.includes(key)) return ROLES[key];
   }
-  return DEFAULT_THEME;
+  return DEFAULT_ROLE;
 }
 
-// ── 스태프 카드 ──
+// ── 스태프 카드 (선수 카드와 같은 프레임, 색만 다름) ──
 function StaffCard({ staff, onEdit, onDelete }: {
   staff: Staff; onEdit: () => void; onDelete: () => void;
 }) {
-  const t = getTheme(staff.role);
-  const initial = staff.name.charAt(0);
+  const r = getRole(staff.role);
+  const careerLines = staff.career.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 3);
+  const shine = (staff.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 4) + 1;
 
   return (
-    <div className="relative group" style={{ perspective: '1000px' }}>
-      <div
-        className="relative overflow-hidden transition-all duration-400 group-hover:scale-[1.04] group-hover:-translate-y-1"
-        style={{
-          aspectRatio: '3/4.2',
-          borderRadius: '16px',
-          background: t.bg,
-          boxShadow: `0 2px 0 ${t.border2}, 0 12px 50px rgba(0,0,0,0.95), 0 0 60px ${t.glow}25, inset 0 1px 0 rgba(255,255,255,0.08)`,
-        }}
-      >
-        {/* ── 외곽 메탈릭 테두리 (3px 두께) ── */}
-        <div style={{
-          position: 'absolute', inset: 0, borderRadius: '16px', zIndex: 25, pointerEvents: 'none',
-          background: `linear-gradient(145deg, ${t.accent} 0%, rgba(255,255,255,0.6) 20%, ${t.border2} 45%, ${t.accent}90 65%, rgba(255,255,255,0.3) 80%, ${t.border2} 100%)`,
-          padding: '1.5px',
-          WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-          WebkitMaskComposite: 'xor', maskComposite: 'exclude',
-        }} />
+    <div className="relative group">
+      <div className={`fcard ${r.cls}`}>
+        {/* 사진 */}
+        {staff.photoURL ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="fcard__shot" src={staff.photoURL} alt={staff.name} draggable={false} />
+        ) : (
+          <div className="fcard__noshot">{staff.name.charAt(0)}</div>
+        )}
 
-        {/* ── 내부 얇은 내선 ── */}
-        <div style={{
-          position: 'absolute', inset: 4, borderRadius: '13px', zIndex: 24, pointerEvents: 'none',
-          border: `1px solid ${t.accent}30`,
-        }} />
+        {/* 프레임 */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="fcard__frame" src={frameSrc(r.cls)} alt="" aria-hidden draggable={false} />
 
-        {/* ── 상단 컬러 바 ── */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: 3, zIndex: 26,
-          background: `linear-gradient(90deg, transparent 0%, ${t.border2} 15%, ${t.accent} 40%, #fff 50%, ${t.accent} 60%, ${t.border2} 85%, transparent 100%)`,
-          borderRadius: '16px 16px 0 0',
-        }} />
+        {/* 왼쪽 위: 역할 */}
+        <div className="fcard__ovr">
+          <span className="fcard__ovr-n is-word">{staff.role}</span>
+          <span className={`fcard__ovr-pos${r.label.length > 5 ? ' is-long' : ''}`}>{r.label}</span>
+        </div>
 
-        {/* ── 대각 스트라이프 (은은하게) ── */}
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', borderRadius: '16px',
-          backgroundImage: `repeating-linear-gradient(55deg, ${t.glow}08 0px, ${t.glow}08 1px, transparent 1px, transparent 14px)`,
-        }} />
+        {/* 이름 */}
+        <h3 className={`fcard__name${staff.name.length > 4 ? ' is-long' : ''}`}>{staff.name}</h3>
 
-        {/* ── 원형 레이더 SVG ── */}
-        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-          <defs>
-            <radialGradient id={`rg-${staff.id}`} cx="50%" cy="40%" r="50%">
-              <stop offset="0%" stopColor={t.glow} stopOpacity="0.25" />
-              <stop offset="60%" stopColor={t.glow} stopOpacity="0.06" />
-              <stop offset="100%" stopColor={t.glow} stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <ellipse cx="50%" cy="40%" rx="90%" ry="70%" fill={`url(#rg-${staff.id})`} />
-          {[38, 62, 88].map(r => (
-            <circle key={r} cx="50%" cy="40%" r={`${r}%`} fill="none" stroke={t.glow} strokeWidth="0.5" opacity="0.12" />
-          ))}
-          {Array.from({ length: 8 }, (_, i) => i * 45).map(deg => {
-            const rad = (deg * Math.PI) / 180;
-            return <line key={deg} x1="50%" y1="40%"
-              x2={`calc(50% + ${160 * Math.cos(rad)}px)`}
-              y2={`calc(40% + ${160 * Math.sin(rad)}px)`}
-              stroke={t.glow} strokeWidth="0.4" opacity="0.08" />;
-          })}
-          {/* 코너 장식 ✦ */}
-          {[{ x: '12%', y: '8%', s: 7 }, { x: '88%', y: '8%', s: 5 }, { x: '10%', y: '92%', s: 4 }, { x: '90%', y: '92%', s: 4 }].map((p, i) => (
-            <text key={i} x={p.x} y={p.y} fontSize={p.s * 2} fill={t.accent} opacity="0.5" textAnchor="middle" dominantBaseline="middle">✦</text>
-          ))}
-        </svg>
-
-        {/* ── 상단: 역할 + TAES ── */}
-        <div style={{ position: 'relative', zIndex: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '12px 13px 0' }}>
-          <div style={{
-            fontSize: 8, fontWeight: 900, letterSpacing: '0.15em', color: t.accent,
-            textShadow: `0 0 10px ${t.glow}`, padding: '2px 7px',
-            background: `${t.glow}18`, borderRadius: 3,
-            border: `1px solid ${t.glow}30`,
-          }}>{t.label}</div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 9, fontWeight: 900, color: t.accent, letterSpacing: '0.15em', lineHeight: 1 }}>TAES</div>
-            <div style={{ fontSize: 6, fontWeight: 700, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.1em' }}>FC</div>
+        {/* 시즌 판 (선수 카드의 등번호 자리) */}
+        <div className="fcard__num">
+          <div className="fcard__num-in">
+            <i className="fcard__num-d" aria-hidden />
+            <span className="fcard__num-lab">SEASON</span>
+            <b className="fcard__num-n">2026</b>
+            <i className="fcard__num-d" aria-hidden />
           </div>
         </div>
 
-        {/* ── 사진 영역 ── */}
-        <div style={{
-          position: 'absolute', bottom: '22%', left: '50%',
-          transform: 'translateX(-50%)',
-          width: '92%', height: '58%',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          zIndex: 10,
-        }}>
-          {staff.photoURL ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={staff.photoURL} alt={staff.name} style={{
-              maxHeight: '100%', maxWidth: '90%', objectFit: 'contain',
-              filter: `drop-shadow(0 6px 20px ${t.glow}60) drop-shadow(0 2px 6px rgba(0,0,0,0.9))`,
-            }} />
-          ) : (
-            <div style={{
-              width: 84, height: 84, borderRadius: '50%',
-              background: `radial-gradient(circle at 35% 35%, ${t.accent}40, ${t.glow}18 50%, transparent 80%)`,
-              border: `2px solid ${t.accent}60`,
-              boxShadow: `0 0 24px ${t.glow}40, inset 0 1px 0 ${t.accent}40`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 34, fontWeight: 900, color: t.accent,
-              textShadow: `0 0 20px ${t.glow}, 0 2px 8px rgba(0,0,0,0.8)`,
-            }}>{initial}</div>
-          )}
-        </div>
-
-        {/* ── 하단 정보 패널 ── */}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 15,
-          background: `linear-gradient(to top, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.88) 60%, transparent 100%)`,
-          padding: '28px 12px 12px',
-          borderRadius: '0 0 16px 16px',
-        }}>
-          {/* 골든 구분선 */}
-          <div style={{
-            height: 1, marginBottom: 9,
-            background: `linear-gradient(90deg, transparent 0%, ${t.border2} 10%, ${t.accent} 35%, #fff 50%, ${t.accent} 65%, ${t.border2} 90%, transparent 100%)`,
-            boxShadow: `0 0 8px ${t.glow}60`,
-          }} />
-
-          {/* 이름 */}
-          <div style={{ textAlign: 'center', marginBottom: 6 }}>
-            <div style={{
-              fontSize: 15, fontWeight: 900, color: '#fff', letterSpacing: '0.06em',
-              textShadow: `0 0 20px ${t.glow}80, 0 1px 4px rgba(0,0,0,0.9)`,
-            }}>{staff.name}</div>
-          </div>
-
-          {/* 경력 */}
-          {staff.career && (
-            <div style={{ borderTop: `1px solid ${t.glow}18`, paddingTop: 7, marginTop: 3 }}>
-              {staff.career.split('\n').filter(Boolean).map((line, i) => (
-                <div key={i} style={{
-                  fontSize: 9, color: `${t.accent}90`, textAlign: 'center',
-                  lineHeight: 1.8, letterSpacing: '0.03em',
-                }}>{line}</div>
-              ))}
+        {/* 능력치 칸 자리에 경력 — 칸 두 줄에 정확히 맞춘다 */}
+        {careerLines.length === 1 ? (
+          <>
+            <div className="fcard__note" style={{ top: '64%', height: '9.4%' }}>
+              <span className="fcard__note-lab" style={{ margin: 0 }}>CAREER</span>
             </div>
-          )}
-        </div>
+            <div className="fcard__note" style={{ top: '75.8%', height: '9.4%' }}>
+              <div>{careerLines[0]}</div>
+            </div>
+          </>
+        ) : careerLines.length > 1 && (
+          <div className="fcard__note" style={{ top: '64%', height: '21.2%' }}>
+            <div>
+              <span className="fcard__note-lab">CAREER</span>
+              {careerLines.map((line, i) => <div key={i}>{line}</div>)}
+            </div>
+          </div>
+        )}
 
-        {/* ── 호버 시 광택 오버레이 ── */}
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" style={{
-          borderRadius: '16px',
-          background: `linear-gradient(135deg, ${t.accent}12 0%, transparent 40%, ${t.accent}06 100%)`,
-        }} />
+        {/* 프레임을 따라 흐르는 빛 */}
+        <div className={`fcard__shine d${shine}`} aria-hidden />
       </div>
 
       {/* ── 수정/삭제 버튼 ── */}
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
         <button onClick={onEdit}
           className="w-7 h-7 flex items-center justify-center text-xs font-bold transition-all"
-          style={{ backgroundColor: 'rgba(0,0,0,0.8)', borderRadius: 4, border: `1px solid ${t.accent}50`, color: t.accent }}>
+          style={{ backgroundColor: 'rgba(0,0,0,0.85)', borderRadius: 4, border: '1px solid rgba(255,255,255,0.35)', color: '#fff' }}>
           ✏
         </button>
         <button onClick={onDelete}
           className="w-7 h-7 flex items-center justify-center text-xs font-bold transition-all"
-          style={{ backgroundColor: 'rgba(180,0,0,0.8)', borderRadius: 4, border: '1px solid rgba(255,100,100,0.4)', color: '#fff' }}>
+          style={{ backgroundColor: 'rgba(180,0,0,0.85)', borderRadius: 4, border: '1px solid rgba(255,100,100,0.4)', color: '#fff' }}>
           ✕
         </button>
       </div>
     </div>
   );
+}
+
+function frameSrc(cls: string) {
+  const name = cls.replace('fcard--', '');
+  return name ? `/card-frame-${name}.webp` : '/card-frame.webp';
 }
 
 const emptyForm = { name: '', role: '감독', career: '', photo: '', photoCleared: false };
