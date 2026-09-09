@@ -99,7 +99,7 @@ function MiniCard({ p }: { p: PlayerCard }) {
         <div className="fcard__ovr">
           <span className="fcard__ovr-n">{ovr}</span>
           <span className="fcard__ovr-pos">{pos}</span>
-          {p.captain && <span className="fcard__cap">주장</span>}
+          {p.captain && <span className="fcard__cap"><i><b>주장</b></i></span>}
         </div>
         <h3 className={`fcard__name${p.name.length > 4 ? ' is-long' : ''}`}>{p.name}</h3>
         <div className="fcard__num">

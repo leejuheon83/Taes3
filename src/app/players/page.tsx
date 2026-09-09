@@ -97,31 +97,35 @@ async function generateCardCanvas(player: Player): Promise<HTMLCanvasElement> {
   ctx.shadowColor = 'rgba(255,36,23,0.6)'; ctx.shadowBlur = 12;
   const pos = (player.positions?.length ? player.positions : [player.pos]).join('·');
   ctx.fillText(pos, W * 0.095, H * 0.075 + W * 0.145);
-  // 주장 표시 — 화면 카드와 같은 각진 금색 판
+  // 주장 표시 — 화면 카드와 같은 금속 이중 테두리 판 + 금색 크롬 글자
   const capY = H * 0.075 + W * 0.215;
   let capH = 0;
   if (player.captain) {
     ctx.save();
-    ctx.font = `400 ${W * 0.06}px ${nameFont}`;
-    const tw = ctx.measureText('주장').width;
-    const padX = W * 0.03, padY = W * 0.01;
-    const bw = tw + padX * 2, bh = W * 0.06 + padY * 2;
+    ctx.font = `400 ${W * 0.056}px ${nameFont}`;
+    const tw = ctx.measureText('주장').width + W * 0.056 * 0.12;
+    const padX = W * 0.034, padY = W * 0.0095, rim = W * 0.0042;
+    const bw = tw + padX * 2 + rim * 2, bh = W * 0.056 + padY * 2 + rim * 2;
     const bx = W * 0.095, by = capY;
     capH = bh + W * 0.018;
-    ctx.shadowColor = 'rgba(255,200,90,0.85)'; ctx.shadowBlur = 20;
-    ctx.shadowOffsetY = 3;
-    const cg = ctx.createLinearGradient(0, by, 0, by + bh);
-    cg.addColorStop(0, '#fff6dc'); cg.addColorStop(0.44, '#ffd968');
-    cg.addColorStop(0.78, '#e2a512'); cg.addColorStop(1, '#ffe9a8');
-    ctx.fillStyle = cg;
-    ctx.beginPath();
-    ctx.moveTo(bx + bw * 0.11, by); ctx.lineTo(bx + bw * 0.89, by);
-    ctx.lineTo(bx + bw, by + bh / 2); ctx.lineTo(bx + bw * 0.89, by + bh);
-    ctx.lineTo(bx + bw * 0.11, by + bh); ctx.lineTo(bx, by + bh / 2);
-    ctx.closePath(); ctx.fill();
+    const hex = (x: number, y: number, w: number, h: number) => {
+      ctx.beginPath();
+      ctx.moveTo(x + w * 0.09, y); ctx.lineTo(x + w * 0.91, y); ctx.lineTo(x + w, y + h / 2);
+      ctx.lineTo(x + w * 0.91, y + h); ctx.lineTo(x + w * 0.09, y + h); ctx.lineTo(x, y + h / 2);
+      ctx.closePath();
+    };
+    ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+    const og = ctx.createLinearGradient(0, by, 0, by + bh);
+    og.addColorStop(0, '#fff3d0'); og.addColorStop(0.28, '#ffd35a'); og.addColorStop(0.64, '#8a5a06'); og.addColorStop(1, '#ffe2a0');
+    ctx.fillStyle = og; hex(bx, by, bw, bh); ctx.fill();
     ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-    ctx.fillStyle = '#2b1a00';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const ig = ctx.createLinearGradient(0, by, 0, by + bh);
+    ig.addColorStop(0, 'rgba(255,214,102,0.22)'); ig.addColorStop(0.45, 'rgba(14,9,2,0.96)'); ig.addColorStop(1, 'rgba(5,3,1,0.98)');
+    ctx.fillStyle = ig; hex(bx + rim, by + rim, bw - rim * 2, bh - rim * 2); ctx.fill();
+    const tg = ctx.createLinearGradient(0, by + rim + padY, 0, by + bh - rim - padY);
+    tg.addColorStop(0, '#fff8e2'); tg.addColorStop(0.48, '#ffd968'); tg.addColorStop(1, '#e2a512');
+    ctx.shadowColor = 'rgba(255,200,90,0.55)'; ctx.shadowBlur = 8;
+    ctx.fillStyle = tg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('주장', bx + bw / 2, by + bh / 2 + W * 0.003);
     ctx.restore();
   }
@@ -392,7 +396,7 @@ function FifaCard({ player, onClick }: { player: Player; onClick: () => void }) 
           <div className="fcard__ovr">
             <span className="fcard__ovr-n">{ovr}</span>
             <span className="fcard__ovr-pos">{(player.positions?.length ? player.positions : [player.pos]).join('·')}</span>
-            {player.captain && <span className="fcard__cap">주장</span>}
+            {player.captain && <span className="fcard__cap"><i><b>주장</b></i></span>}
             {player.honorary && <span className="fcard__hon">★ 명예회원</span>}
           </div>
 
