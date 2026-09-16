@@ -50,6 +50,7 @@ export default function VideosPage() {
 
   // 등록 모달 (YouTube 링크만 지원)
   const [showUpload, setShowUpload] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);   // 수정 중인 영상 (null이면 새 등록)
   const [form, setForm] = useState({ title: '', date: new Date().toISOString().slice(0,10).replace(/-/g,'.'), description: '', youtubeUrl: '' });
   const [uploading, setUploading] = useState(false);
 
@@ -129,11 +130,53 @@ export default function VideosPage() {
     }
   }
 
+  const emptyForm = () => ({ title: '', date: new Date().toISOString().slice(0,10).replace(/-/g,'.'), description: '', youtubeUrl: '' });
+
+  function openAdd() {
+    setEditId(null);
+    setForm(emptyForm());
+    setShowUpload(true);
+  }
+
+  function openEdit(v: VideoMeta) {
+    setEditId(v.id);
+    setForm({ title: v.title, date: v.date, description: v.description ?? '', youtubeUrl: `https://youtu.be/${v.youtubeId}` });
+    setShowUpload(true);
+  }
+
+  function closeForm() {
+    setShowUpload(false);
+    setEditId(null);
+    setForm(emptyForm());
+  }
+
   async function handleSubmit() {
     if (!form.title.trim()) return;
     const yid = extractYoutubeId(form.youtubeUrl);
     if (!yid) { alert('올바른 YouTube URL을 입력해 주세요.'); return; }
     setUploading(true);
+
+    // 수정: 같은 문서에 덮어쓰고, 메인 영상이면 메인 설정도 같이 고친다
+    if (editId) {
+      try {
+        const patch = { title: form.title.trim(), date: form.date, description: form.description, youtubeId: yid };
+        await setDoc(doc(db, 'videos', editId), patch, { merge: true });
+        if (featuredVideoId === editId) {
+          await setDoc(doc(db, 'settings', 'main'), {
+            featuredVideo: { id: editId, title: patch.title, youtubeId: yid, date: patch.date },
+          }, { merge: true });
+        }
+        setMetas(prev => prev.map(m => m.id === editId ? { ...m, ...patch } : m));
+        closeForm();
+      } catch (err) {
+        console.error('Failed to update video:', err);
+        alert('수정 저장에 실패했습니다.');
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+
     try {
       const id = String(Date.now());
       const meta: VideoMeta = {
@@ -157,8 +200,7 @@ export default function VideosPage() {
       alert('등록에 실패했습니다.');
     } finally {
       setUploading(false);
-      setShowUpload(false);
-      setForm({ title: '', date: new Date().toISOString().slice(0,10).replace(/-/g,'.'), description: '', youtubeUrl: '' });
+      closeForm();
     }
   }
 
@@ -235,18 +277,18 @@ export default function VideosPage() {
               <div className="mb-10 flex flex-col items-center justify-center py-20 text-white/20 border border-white/10" style={{ backgroundColor: '#080808' }}>
                 <div className="text-6xl mb-4">🎬</div>
                 <div className="text-lg font-bold mb-1">등록된 영상이 없습니다</div>
-                <div className="text-sm">YouTube 영상 등록 버튼을 눌러 추가해 주세요</div>
+                <div className="text-sm">영상 올리기 버튼을 눌러 추가해 주세요</div>
               </div>
             )}
 
             {/* Upload button */}
             <div className="flex justify-end mb-6">
               <button
-                onClick={() => setShowUpload(true)}
+                onClick={() => requireAdmin(openAdd)}
                 className="sm:ml-auto px-6 py-2 text-sm font-bold text-white hover:opacity-80 transition-colors flex items-center gap-2"
                 style={{ backgroundColor: '#CC0000' }}
               >
-                ▶ YouTube 영상 등록
+                ▶ 영상 올리기
               </button>
             </div>
 
@@ -278,27 +320,38 @@ export default function VideosPage() {
                       </div>
                       <div className="p-3">
                         <div className="text-white/80 text-xs font-semibold mb-1.5 line-clamp-2 leading-snug">{v.title}</div>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2">
                           <span className="text-[10px] text-white/30">{v.date}</span>
-                          <button
-                            onClick={() => requireAdmin(() => handleSetFeaturedVideo(v))}
-                            className="text-[10px] font-black px-2 py-0.5 transition-colors"
-                            style={{
-                              backgroundColor: isFeatured ? 'rgba(204,0,0,0.2)' : 'rgba(255,255,255,0.07)',
-                              color: isFeatured ? '#CC0000' : 'rgba(255,255,255,0.4)',
-                            }}
-                          >
-                            {isFeatured ? '★ 메인' : '메인설정'}
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => requireAdmin(() => handleSetFeaturedVideo(v))}
+                              className="text-[10px] font-black px-2 py-1 transition-colors"
+                              style={{
+                                minHeight: 0,
+                                backgroundColor: isFeatured ? 'rgba(204,0,0,0.2)' : 'rgba(255,255,255,0.07)',
+                                color: isFeatured ? '#CC0000' : 'rgba(255,255,255,0.4)',
+                              }}
+                            >
+                              {isFeatured ? '★ 메인' : '메인설정'}
+                            </button>
+                            <button
+                              onClick={() => requireAdmin(() => openEdit(v))}
+                              className="text-[10px] font-bold px-2 py-1 text-white/50 hover:text-white transition-colors"
+                              style={{ minHeight: 0, backgroundColor: 'rgba(255,255,255,0.07)' }}
+                            >
+                              수정
+                            </button>
+                            <button
+                              onClick={() => requireAdmin(() => handleDelete(v.id))}
+                              className="text-[10px] font-bold px-2 py-1 text-white/50 hover:text-white hover:bg-red-800 transition-colors"
+                              style={{ minHeight: 0, backgroundColor: 'rgba(255,255,255,0.07)' }}
+                            >
+                              삭제
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => requireAdmin(() => handleDelete(v.id))}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 text-white/50 hover:text-white hover:bg-red-800 text-xs font-bold opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
-                    >
-                      ✕
-                    </button>
                   </div>
                   );
                 })}
@@ -313,8 +366,8 @@ export default function VideosPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.88)' }}>
           <div className="w-full max-w-lg p-6 border border-white/10 overflow-y-auto max-h-[90vh]" style={{ backgroundColor: '#080808' }}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg section-title">영상 등록</h2>
-              <button onClick={() => setShowUpload(false)} className="text-white/40 hover:text-white text-xl">✕</button>
+              <h2 className="text-lg section-title">{editId ? '영상 수정' : '영상 올리기'}</h2>
+              <button onClick={closeForm} className="text-white/40 hover:text-white text-xl">✕</button>
             </div>
 
             {/* 안내 */}
@@ -375,14 +428,14 @@ export default function VideosPage() {
             </div>
 
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowUpload(false)} className="flex-1 py-2 text-sm font-bold text-white/50 border border-white/10 hover:border-white/30 transition-colors">취소</button>
+              <button onClick={closeForm} className="flex-1 py-2 text-sm font-bold text-white/50 border border-white/10 hover:border-white/30 transition-colors">취소</button>
               <button
                 onClick={handleSubmit}
                 disabled={uploading || !form.title.trim()}
                 className="flex-1 py-2 text-sm font-bold text-white hover:opacity-80 disabled:opacity-40 transition-colors"
                 style={{ backgroundColor: '#CC0000' }}
               >
-                {uploading ? '업로드 중...' : '등록'}
+                {uploading ? '저장 중...' : editId ? '저장' : '등록'}
               </button>
             </div>
           </div>
