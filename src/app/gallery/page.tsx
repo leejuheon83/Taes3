@@ -509,7 +509,7 @@ export default function GalleryPage() {
                   + 추가
                 </button>
                 <button
-                  onClick={() => handleDeleteAlbum(openAlbum.id)}
+                  onClick={() => requireAdmin(() => handleDeleteAlbum(openAlbum.id), { reconfirm: true })}
                   className="px-4 py-2.5 sm:py-2 text-sm font-bold text-white/50 hover:text-red-400 border border-white/10 hover:border-red-800/50 transition-colors flex-1 sm:flex-none touch-manipulation"
                 >
                   앨범 삭제
@@ -560,7 +560,7 @@ export default function GalleryPage() {
                         {isFeatured ? '✓ 메인 설정됨' : '★ 메인으로 설정'}
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteItem(openAlbum.id, item.id); }}
+                        onClick={(e) => { e.stopPropagation(); requireAdmin(() => handleDeleteItem(openAlbum.id, item.id), { reconfirm: true }); }}
                         className="pointer-events-auto px-2 py-1 text-[10px] font-bold text-white/70 hover:text-white bg-black/60 hover:bg-red-900 transition-colors"
                       >
                         삭제
@@ -656,7 +656,7 @@ export default function GalleryPage() {
                       </div>
                     </button>
                     <button
-                      onClick={() => handleDeleteAlbum(album.id)}
+                      onClick={() => requireAdmin(() => handleDeleteAlbum(album.id), { reconfirm: true })}
                       className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 text-white/50 hover:text-white hover:bg-red-800 text-xs font-bold opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
                     >
                       ✕

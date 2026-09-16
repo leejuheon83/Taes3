@@ -647,7 +647,7 @@ function PlayersContent() {
     setForm(f => ({ ...f, modelPhoto: compressed }));
   };
 
-  const openEdit = (p: Player) => requireAdmin(() => { setForm(playerToForm(p)); setEditMode(true); setAddMode(false); });
+  const openEdit = (p: Player) => requireAdmin(() => { setForm(playerToForm(p)); setEditMode(true); setAddMode(false); }, { reconfirm: true });
   const openAdd  = () => requireAdmin(() => { setForm(emptyForm); setAddMode(true); setEditMode(false); setSelected(null); });
   const closeModal = () => { setSelected(null); setEditMode(false); setAddMode(false); setDeleteTarget(null); };
 
@@ -857,7 +857,7 @@ function PlayersContent() {
                       className="px-4 py-1.5 text-xs font-bold text-white border border-white/20 hover:border-white/50 transition-colors">
                       수정
                     </button>
-                    <button onClick={() => requireAdmin(() => setDeleteTarget(selected))}
+                    <button onClick={() => requireAdmin(() => setDeleteTarget(selected), { reconfirm: true })}
                       className="px-4 py-1.5 text-xs font-bold text-white hover:opacity-80 transition-opacity"
                       style={{ backgroundColor: '#dc2626' }}>
                       삭제

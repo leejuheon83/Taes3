@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Notice } from '../page';
 import { db } from '@/lib/firebase';
+import { useAdminAuth } from '@/components/AdminAuth';
 import {
   collection, getDocs, doc, updateDoc, deleteDoc, orderBy, query, increment
 } from 'firebase/firestore';
@@ -17,6 +18,7 @@ const CATEGORIES = ['중요', '훈련', '행사', '대회', '공지'];
 export default function NoticeDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { requireAdmin, modal: adminModal } = useAdminAuth();
   const id = String(params.id);
 
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -151,13 +153,13 @@ export default function NoticeDetailPage() {
             {/* 수정/삭제 버튼 */}
             <div className="flex justify-end gap-2 mb-8">
               <button
-                onClick={() => setEditing(true)}
+                onClick={() => requireAdmin(() => setEditing(true), { reconfirm: true })}
                 className="px-5 py-2 text-sm font-bold text-white/60 border border-white/10 hover:border-white/30 hover:text-white transition-colors"
               >
                 수정
               </button>
               <button
-                onClick={handleDelete}
+                onClick={() => requireAdmin(handleDelete, { reconfirm: true })}
                 className="px-5 py-2 text-sm font-bold text-white hover:opacity-80 transition-colors"
                 style={{ backgroundColor: '#dc2626' }}
               >
@@ -232,6 +234,7 @@ export default function NoticeDetailPage() {
           </div>
         )}
       </div>
+      {adminModal}
     </div>
   );
 }

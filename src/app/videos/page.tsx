@@ -335,14 +335,14 @@ export default function VideosPage() {
                               {isFeatured ? '★ 메인' : '메인설정'}
                             </button>
                             <button
-                              onClick={() => requireAdmin(() => openEdit(v))}
+                              onClick={() => requireAdmin(() => openEdit(v), { reconfirm: true })}
                               className="text-[10px] font-bold px-2 py-1 text-white/50 hover:text-white transition-colors"
                               style={{ minHeight: 0, backgroundColor: 'rgba(255,255,255,0.07)' }}
                             >
                               수정
                             </button>
                             <button
-                              onClick={() => requireAdmin(() => handleDelete(v.id))}
+                              onClick={() => requireAdmin(() => handleDelete(v.id), { reconfirm: true })}
                               className="text-[10px] font-bold px-2 py-1 text-white/50 hover:text-white hover:bg-red-800 transition-colors"
                               style={{ minHeight: 0, backgroundColor: 'rgba(255,255,255,0.07)' }}
                             >

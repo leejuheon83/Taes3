@@ -15,10 +15,16 @@ export function useAdminAuth() {
   const [input, setInput] = useState('');
   const [error, setError] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [reconfirm, setReconfirm] = useState(false);
 
-  const requireAdmin = useCallback((action: () => void) => {
-    if (isAdmin()) { action(); return; }
+  /**
+   * 관리자 확인 뒤 action을 실행한다.
+   * reconfirm: true — 한 번 인증했더라도 매번 다시 비밀번호를 묻는다 (수정·삭제용)
+   */
+  const requireAdmin = useCallback((action: () => void, opts?: { reconfirm?: boolean }) => {
+    if (isAdmin() && !opts?.reconfirm) { action(); return; }
     setPendingAction(() => action);
+    setReconfirm(!!opts?.reconfirm);
     setInput('');
     setError(false);
     setShowModal(true);
@@ -50,7 +56,7 @@ export function useAdminAuth() {
           <span className="text-xl">🔐</span>
           <h2 className="text-white font-black text-lg">관리자 인증</h2>
         </div>
-        <p className="text-white/40 text-sm mb-4">이 작업을 수행하려면 관리자 비밀번호가 필요합니다.</p>
+        <p className="text-white/40 text-sm mb-4">{reconfirm ? '수정·삭제는 매번 비밀번호를 다시 확인합니다.' : '이 작업을 수행하려면 관리자 비밀번호가 필요합니다.'}</p>
         <input
           autoFocus
           type="password"

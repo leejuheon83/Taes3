@@ -358,13 +358,13 @@ export default function SchedulePage() {
                     </div>
                     <div className="flex flex-col gap-1">
                       <button
-                        onClick={() => requireAdmin(() => openEdit(m))}
+                        onClick={() => requireAdmin(() => openEdit(m), { reconfirm: true })}
                         className="text-[10px] font-bold px-2 py-1 text-white/60 hover:text-white border border-white/10 hover:border-white/30 transition-colors"
                       >
                         수정
                       </button>
                       <button
-                        onClick={() => requireAdmin(() => setDeleteId(m.id))}
+                        onClick={() => requireAdmin(() => setDeleteId(m.id), { reconfirm: true })}
                         className="text-[10px] font-bold px-2 py-1 hover:text-white border border-red-900/30 hover:border-red-600 transition-colors"
                         style={{ color: '#dc2626' }}
                       >

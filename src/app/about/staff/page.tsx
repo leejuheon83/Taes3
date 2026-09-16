@@ -187,7 +187,7 @@ export default function StaffPage() {
   const openEdit = (s: Staff) => requireAdmin(() => {
     setForm({ name: s.name, role: s.role, career: s.career, photo: s.photoURL ?? '', photoCleared: false });
     setEditTarget(s); setShowForm(true);
-  });
+  }, { reconfirm: true });
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -275,7 +275,7 @@ export default function StaffPage() {
                 key={s.id}
                 staff={s}
                 onEdit={() => openEdit(s)}
-                onDelete={() => requireAdmin(() => setDeleteTarget(s))}
+                onDelete={() => requireAdmin(() => setDeleteTarget(s), { reconfirm: true })}
               />
             ))}
           </div>
