@@ -181,6 +181,8 @@ export default function Home() {
   const [manager, setManager] = useState<StaffCard | null>(null);
   const [galleryPhotos, setGalleryPhotos] = useState<string[]>([]);
   const [photoView, setPhotoView] = useState<number | null>(null);   // 크게 보는 사진 번호
+  const [galleryVideos, setGalleryVideos] = useState<{ id: string; title: string; date: string; youtubeId: string }[]>([]);
+  const [videoView, setVideoView] = useState<number | null>(null);   // 재생 중인 영상 번호
 
   // 사진 크게 보기: Esc 닫기, ←/→ 넘기기
   useEffect(() => {
@@ -193,6 +195,17 @@ export default function Home() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [photoView, galleryPhotos.length]);
+
+  useEffect(() => {
+    if (videoView === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setVideoView(null);
+      else if (e.key === 'ArrowLeft' && videoView > 0) setVideoView(videoView - 1);
+      else if (e.key === 'ArrowRight' && videoView < galleryVideos.length - 1) setVideoView(videoView + 1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [videoView, galleryVideos.length]);
 
   useEffect(() => {
     async function loadData() {
@@ -237,6 +250,16 @@ export default function Home() {
           }
         }
         setGalleryPhotos(photos);
+      } catch { /* ignore */ }
+
+      try {
+        // 최신 영상 6개 (메인 영상 갤러리)
+        const vq = query(collection(db, 'videos'), orderBy('date', 'desc'), limit(6));
+        const vSnap = await getDocs(vq);
+        setGalleryVideos(vSnap.docs
+          .map(d => ({ id: d.id, ...(d.data() as { title?: string; date?: string; youtubeId?: string }) }))
+          .filter(v => !!v.youtubeId)
+          .map(v => ({ id: v.id, title: v.title ?? '', date: v.date ?? '', youtubeId: v.youtubeId! })));
       } catch { /* ignore */ }
 
       try {
@@ -699,6 +722,42 @@ export default function Home() {
                 }
               </div>
             </div>
+
+            {/* 영상 갤러리 — 사진 갤러리와 같은 결, 누르면 그 자리에서 재생 */}
+            <div>
+              <div className="flex items-end justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl section-title">영상 갤러리</h2>
+                  <div className="section-divider mt-2" />
+                </div>
+                <Link href="/videos" className="text-sm text-white/50 hover:text-red-500 transition-colors">더보기 →</Link>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {galleryVideos.length > 0
+                  ? galleryVideos.map((v, i) => (
+                    <button key={v.id} type="button" onClick={() => setVideoView(i)}
+                      aria-label={`${v.title} 재생`}
+                      className="aspect-video overflow-hidden group relative block w-full p-0 border-0 cursor-pointer text-left"
+                      style={{ backgroundColor: '#0e0e0e', minHeight: 0 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`https://img.youtube.com/vi/${v.youtubeId}/mqdefault.jpg`} alt=""
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"/>
+                      <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.05) 55%)' }}>
+                        <span className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm shadow-lg" style={{ backgroundColor: 'rgba(204,0,0,0.92)' }}>▶</span>
+                      </div>
+                      <div className="absolute left-2 right-2 bottom-1.5 text-[11px] font-bold text-white/90 line-clamp-1 leading-snug">{v.title}</div>
+                    </button>
+                  ))
+                  : Array.from({ length: 4 }).map((_, i) => (
+                    <Link key={i} href="/videos"
+                      className="aspect-video border border-white/10 flex items-center justify-center text-white/10 text-3xl"
+                      style={{ backgroundColor: '#0e0e0e' }}>
+                      <span>▶</span>
+                    </Link>
+                  ))
+                }
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -728,6 +787,43 @@ export default function Home() {
               aria-label="다음 사진" onClick={e => { e.stopPropagation(); setPhotoView(photoView + 1); }}>›</button>
           )}
           <div className="absolute bottom-4 text-white/30 text-xs sm:text-sm select-none">{photoView + 1} / {galleryPhotos.length}</div>
+        </div>
+      )}
+
+      {/* ─── 영상 바로 재생 ─── */}
+      {videoView !== null && galleryVideos[videoView] && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.97)' }}
+          onClick={() => setVideoView(null)}>
+          <button className="absolute top-3 right-3 sm:top-4 sm:right-4 text-white/60 hover:text-white text-2xl z-10 p-2"
+            style={{ minHeight: 0 }} aria-label="닫기" onClick={() => setVideoView(null)}>✕</button>
+          <Link href="/videos" onClick={e => e.stopPropagation()}
+            className="absolute top-4 left-4 z-10 px-3 py-2 text-xs sm:text-sm font-bold text-white/80 hover:text-white border border-white/20 hover:border-white/50 transition-colors"
+            style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}>
+            영상 전체 보기 →
+          </Link>
+          {videoView > 0 && (
+            <button className="absolute left-2 sm:left-6 text-white/60 hover:text-white text-4xl sm:text-5xl z-10 p-3" style={{ minHeight: 0 }}
+              aria-label="이전 영상" onClick={e => { e.stopPropagation(); setVideoView(videoView - 1); }}>‹</button>
+          )}
+          <div className="w-full max-w-5xl px-2 sm:px-16" onClick={e => e.stopPropagation()}>
+            <div className="aspect-video w-full bg-black" style={{ boxShadow: '0 20px 80px rgba(0,0,0,0.8)' }}>
+              <iframe
+                key={galleryVideos[videoView].id}
+                src={`https://www.youtube.com/embed/${galleryVideos[videoView].youtubeId}?autoplay=1&rel=0`}
+                title={galleryVideos[videoView].title}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+            <div className="mt-3 text-white font-bold text-sm sm:text-base line-clamp-1">{galleryVideos[videoView].title}</div>
+            <div className="text-white/40 text-xs mt-0.5">{galleryVideos[videoView].date}</div>
+          </div>
+          {videoView < galleryVideos.length - 1 && (
+            <button className="absolute right-2 sm:right-6 text-white/60 hover:text-white text-4xl sm:text-5xl z-10 p-3" style={{ minHeight: 0 }}
+              aria-label="다음 영상" onClick={e => { e.stopPropagation(); setVideoView(videoView + 1); }}>›</button>
+          )}
+          <div className="absolute bottom-4 text-white/30 text-xs sm:text-sm select-none">{videoView + 1} / {galleryVideos.length}</div>
         </div>
       )}
     </div>
