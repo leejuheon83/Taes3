@@ -253,8 +253,8 @@ export default function Home() {
       } catch { /* ignore */ }
 
       try {
-        // 최신 영상 6개 (메인 영상 갤러리)
-        const vq = query(collection(db, 'videos'), orderBy('date', 'desc'), limit(6));
+        // 최신 영상 4개 (메인 영상 갤러리 — 2×2)
+        const vq = query(collection(db, 'videos'), orderBy('date', 'desc'), limit(4));
         const vSnap = await getDocs(vq);
         setGalleryVideos(vSnap.docs
           .map(d => ({ id: d.id, ...(d.data() as { title?: string; date?: string; youtubeId?: string }) }))
