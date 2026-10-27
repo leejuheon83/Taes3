@@ -5,7 +5,7 @@ import { useAdminAuth } from '@/components/AdminAuth';
 import { SkeletonRows } from '@/components/Skeleton';
 import { db } from '@/lib/firebase';
 import {
-  collection, getDocs, doc, setDoc, deleteDoc, orderBy, query
+  collection, getDocs, doc, setDoc, deleteDoc, orderBy, query, writeBatch, deleteField
 } from 'firebase/firestore';
 import {
   MAINLAND, JEJU, HOME, VIEW_W, VIEW_H,
@@ -117,6 +117,11 @@ export default function MapPage() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
+
+  // 경기 연결
+  const [linkTarget, setLinkTarget] = useState<Tournament | null>(null);
+  const [linkPicked, setLinkPicked] = useState<Set<string>>(new Set());
+  const [linkShowAll, setLinkShowAll] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -307,6 +312,60 @@ export default function MapPage() {
     } catch (err) {
       console.error('Failed to delete tournament:', err);
       alert('삭제에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ── 경기 연결 ──
+  /** 대회 기간 ±3일 안의 경기를 후보로 본다 (예선이 하루 일찍 열리는 경우 대비) */
+  function inRange(m: Match, t: Tournament) {
+    const shift = (iso: string, days: number) => {
+      const d = new Date(`${iso}T00:00:00`);
+      d.setDate(d.getDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
+    return m.date >= shift(t.from, -3) && m.date <= shift(t.to || t.from, 3);
+  }
+
+  function openLink(t: Tournament) {
+    setLinkTarget(t);
+    setLinkPicked(new Set(matches.filter(m => m.tournamentId === t.id).map(m => m.id)));
+    setLinkShowAll(false);
+  }
+
+  function togglePick(id: string) {
+    setLinkPicked(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleSaveLinks() {
+    if (!linkTarget) return;
+    const t = linkTarget;
+    const before = new Set(matches.filter(m => m.tournamentId === t.id).map(m => m.id));
+    const toLink = [...linkPicked].filter(id => !before.has(id));
+    const toUnlink = [...before].filter(id => !linkPicked.has(id));
+    if (!toLink.length && !toUnlink.length) { setLinkTarget(null); return; }
+
+    setSaving(true);
+    try {
+      const batch = writeBatch(db);
+      toLink.forEach(id => batch.update(doc(db, 'matches', id), { tournamentId: t.id }));
+      toUnlink.forEach(id => batch.update(doc(db, 'matches', id), { tournamentId: deleteField() }));
+      await batch.commit();
+
+      setMatches(prev => prev.map(m => {
+        if (toLink.includes(m.id)) return { ...m, tournamentId: t.id };
+        if (toUnlink.includes(m.id)) return { ...m, tournamentId: undefined };
+        return m;
+      }));
+      setLinkTarget(null);
+    } catch (err) {
+      console.error('Failed to link matches:', err);
+      alert('경기 연결에 실패했습니다.');
     } finally {
       setSaving(false);
     }
@@ -561,7 +620,14 @@ export default function MapPage() {
                         </>
                       )}
 
-                      <div className="flex gap-2 mt-4">
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        <button
+                          onClick={() => requireAdmin(() => openLink(selected))}
+                          className="px-3 py-1.5 text-xs font-bold text-white border transition-colors"
+                          style={{ borderColor: 'rgba(204,0,0,0.6)', color: '#ff8b84' }}
+                        >
+                          ⚽ 경기 연결
+                        </button>
                         <button
                           onClick={() => requireAdmin(() => openEdit(selected), { reconfirm: true })}
                           className="px-3 py-1.5 text-xs font-bold text-white/60 border border-white/20 hover:border-white/40 transition-colors"
@@ -608,10 +674,19 @@ export default function MapPage() {
                           </tbody>
                         </table>
                       ) : (
-                        <p className="text-white/30 text-[13px]">
-                          이 대회에 연결된 경기가 없습니다. 경기 일정에서 <b className="text-white/50">tournamentId</b>를{' '}
-                          <b className="text-white/50">{selected.id}</b>로 지정하면 여기에 표시됩니다.
-                        </p>
+                        <div className="text-[13px]">
+                          <p className="text-white/30 mb-3">
+                            이 대회에 연결된 경기가 없습니다. 경기 일정에 등록된 경기를 골라 연결하면
+                            전적과 득실이 자동으로 계산됩니다.
+                          </p>
+                          <button
+                            onClick={() => requireAdmin(() => openLink(selected))}
+                            className="px-3 py-2 text-xs font-bold text-white hover:opacity-80 transition-opacity"
+                            style={{ backgroundColor: '#CC0000' }}
+                          >
+                            ⚽ 경기 연결하기
+                          </button>
+                        </div>
                       )}
                     </div>
                   </>
@@ -768,6 +843,95 @@ export default function MapPage() {
           </form>
         </div>
       )}
+
+      {/* 경기 연결 */}
+      {linkTarget && (() => {
+        const t = linkTarget;
+        const candidates = matches
+          .filter(m => linkShowAll || inRange(m, t) || m.tournamentId === t.id)
+          .sort((a, b) => a.date.localeCompare(b.date));
+        const nameOf = (id?: string) => tournaments.find(x => x.id === id)?.name ?? '다른 대회';
+        return (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center px-4 py-8 overflow-y-auto"
+            style={{ backgroundColor: 'rgba(0,0,0,0.92)' }}
+            onClick={e => { if (e.target === e.currentTarget) setLinkTarget(null); }}>
+            <div className="w-full max-w-lg border border-white/10 p-5 my-auto" style={{ backgroundColor: '#111' }}>
+              <h2 className="text-white font-black text-lg">경기 연결</h2>
+              <p className="text-white/40 text-xs mt-1 mb-4">
+                <b className="text-white/70">{t.name}</b> · {formatRange(t.from, t.to)}
+              </p>
+
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <span className="text-white/40 text-xs">
+                  {linkShowAll ? '전체 경기' : '대회 기간 전후'} {candidates.length}건 · 선택 {linkPicked.size}건
+                </span>
+                <button type="button" onClick={() => setLinkShowAll(v => !v)}
+                  className="flex-none text-xs text-white/50 underline hover:text-white transition-colors">
+                  {linkShowAll ? '기간 내만 보기' : '전체 경기 보기'}
+                </button>
+              </div>
+
+              {candidates.length ? (
+                <ul className="border border-white/10 max-h-80 overflow-y-auto">
+                  {candidates.map(m => {
+                    const { gf, ga, opponent } = goalsFor(m);
+                    const other = m.tournamentId && m.tournamentId !== t.id;
+                    return (
+                      <li key={m.id} className="border-b border-white/5 last:border-0">
+                        <label className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-white/5 transition-colors">
+                          <input type="checkbox" checked={linkPicked.has(m.id)}
+                            onChange={() => togglePick(m.id)}
+                            className="flex-none w-4 h-4 accent-[#CC0000]" />
+                          <span className="flex-none text-white/40 text-xs w-[62px]">
+                            {m.date.slice(2).replace(/-/g, '.')}
+                          </span>
+                          <span className="min-w-0 flex-1 text-white/85 text-[13px]">
+                            {opponent}
+                            {other && (
+                              <span className="block text-[11px]" style={{ color: '#e3b341' }}>
+                                {nameOf(m.tournamentId)}에 연결됨
+                              </span>
+                            )}
+                          </span>
+                          <span className="flex-none text-white font-black text-sm">{gf}:{ga}</span>
+                          {m.result && (
+                            <span className="flex-none inline-grid place-items-center text-[11px] font-bold text-white"
+                              style={{ width: 20, height: 20, backgroundColor: resultColors[m.result] }}>
+                              {m.result}
+                            </span>
+                          )}
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-white/30 text-[13px] border border-white/10 px-3 py-7 text-center">
+                  {linkShowAll
+                    ? '경기 일정에 등록된 경기가 없습니다. 먼저 경기를 등록해 주세요.'
+                    : '대회 기간에 해당하는 경기가 없습니다. 전체 경기 보기를 눌러보세요.'}
+                </p>
+              )}
+
+              <p className="text-white/25 text-[11px] mt-2">
+                체크를 해제하면 연결만 끊어지고 경기 기록은 그대로 남습니다.
+              </p>
+
+              <div className="flex gap-3 mt-5">
+                <button type="button" onClick={() => setLinkTarget(null)}
+                  className="flex-1 py-2.5 text-sm font-bold text-white/50 border border-white/20 hover:border-white/40 transition-colors">
+                  취소
+                </button>
+                <button type="button" onClick={handleSaveLinks} disabled={saving}
+                  className="flex-1 py-2.5 text-sm font-bold text-white hover:opacity-80 transition-opacity disabled:opacity-40"
+                  style={{ backgroundColor: '#CC0000' }}>
+                  {saving ? '저장 중…' : '저장'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 삭제 확인 */}
       {deleteId && (
