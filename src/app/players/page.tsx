@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import NextImage from 'next/image';
 import { shotClass, hasCutoutBackground } from '@/lib/photo';
 import { useAdminAuth } from '@/components/AdminAuth';
@@ -9,6 +10,8 @@ import { db } from '@/lib/firebase';
 import {
   collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, orderBy, query
 } from 'firebase/firestore';
+
+const USER_AUTH_KEY = 'taes-user-login';
 
 // ── 이미지 로딩 헬퍼 ──
 function loadImg(src: string): Promise<HTMLImageElement> {
@@ -595,8 +598,20 @@ function PlayersContent() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const fileRef = useRef<HTMLInputElement>(null);
   const modelFileRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // 사진·영상과 동일하게 로그인한 사용자에게만 공개한다
+  useEffect(() => {
+    if (localStorage.getItem(USER_AUTH_KEY) !== '1') {
+      router.replace('/login');
+      return;
+    }
+    setAuthChecked(true);
+  }, [router]);
 
   useEffect(() => {
+    if (!authChecked) return;
     async function loadPlayers() {
       try {
         const q = query(collection(db, 'players'), orderBy('no'));
@@ -627,7 +642,7 @@ function PlayersContent() {
       }
     }
     loadPlayers();
-  }, []);
+  }, [authChecked]);
 
   const sf = (key: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -771,6 +786,8 @@ function PlayersContent() {
   });
 
   const showForm = editMode || addMode;
+
+  if (!authChecked) return null;
 
   return (
     <div className="min-h-screen">
