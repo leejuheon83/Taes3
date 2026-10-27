@@ -644,51 +644,6 @@ export default function MapPage() {
                       </div>
                     </div>
 
-                    <div className="p-4 sm:p-5">
-                      <h3 className="text-white/40 text-[11px] tracking-widest font-bold mb-3">경기 결과</h3>
-                      {selectedMatches.length ? (
-                        <table className="w-full text-[13px]">
-                          <tbody>
-                            {selectedMatches.map(m => {
-                              const { gf, ga, opponent } = goalsFor(m);
-                              return (
-                                <tr key={m.id} className="border-b border-white/5 last:border-0">
-                                  <td className="py-2.5 text-white/40 whitespace-nowrap w-[52px]">
-                                    {m.date.slice(5).replace('-', '.')}
-                                  </td>
-                                  <td className="py-2.5 text-white/85">{opponent}</td>
-                                  <td className="py-2.5 text-right font-black text-base text-white whitespace-nowrap w-[52px]">
-                                    {gf}:{ga}
-                                  </td>
-                                  <td className="py-2.5 text-right w-[26px]">
-                                    {m.result && (
-                                      <span className="inline-grid place-items-center text-[11px] font-bold text-white"
-                                        style={{ width: 20, height: 20, backgroundColor: resultColors[m.result] }}>
-                                        {m.result}
-                                      </span>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      ) : (
-                        <div className="text-[13px]">
-                          <p className="text-white/30 mb-3">
-                            이 대회에 연결된 경기가 없습니다. 경기 일정에 등록된 경기를 골라 연결하면
-                            전적과 득실이 자동으로 계산됩니다.
-                          </p>
-                          <button
-                            onClick={() => requireAdmin(() => openLink(selected))}
-                            className="px-3 py-2 text-xs font-bold text-white hover:opacity-80 transition-opacity"
-                            style={{ backgroundColor: '#CC0000' }}
-                          >
-                            ⚽ 경기 연결하기
-                          </button>
-                        </div>
-                      )}
-                    </div>
                   </>
                 ) : (
                   <div className="p-8 text-center text-white/40 text-sm">
@@ -700,14 +655,22 @@ export default function MapPage() {
                   <h3 className="text-white/40 text-[11px] tracking-widest font-bold mb-3">
                     전체 대회 <span className="text-white/20">({visible.length})</span>
                   </h3>
-                  <ol className="grid gap-px max-h-[320px] overflow-y-auto">
+                  <ol className="grid gap-px max-h-[560px] overflow-y-auto">
                     {[...visible].reverse().map(t => {
-                      const rec = recordOf(matchesByTournament.get(t.id) ?? []);
+                      const games = matchesByTournament.get(t.id) ?? [];
+                      const rec = recordOf(games);
                       const isSel = t.id === selectedId;
                       return (
                         <li key={t.id}>
                           <button
-                            onClick={() => setSelectedId(t.id)}
+                            onClick={e => {
+                              const el = e.currentTarget;
+                              setSelectedId(t.id);
+                              // 펼쳐진 내용이 목록 스크롤 밖으로 밀려나지 않게 한다
+                              requestAnimationFrame(() =>
+                                el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+                            }}
+                            aria-expanded={isSel}
                             aria-pressed={isSel}
                             className="w-full text-left px-3 py-2.5 grid grid-cols-[1fr_auto] gap-x-3 items-center transition-colors"
                             style={{
@@ -728,6 +691,53 @@ export default function MapPage() {
                               {formatRange(t.from, t.to)} · {t.city}
                             </span>
                           </button>
+
+                          {isSel && (
+                            <div className="px-3 pt-1 pb-3"
+                              style={{ backgroundColor: '#23191a', borderLeft: '3px solid #CC0000' }}>
+                              {games.length ? (
+                                <table className="w-full text-[13px]">
+                                  <tbody>
+                                    {games.map(m => {
+                                      const { gf, ga, opponent } = goalsFor(m);
+                                      return (
+                                        <tr key={m.id} className="border-b border-white/5 last:border-0">
+                                          <td className="py-2 text-white/40 whitespace-nowrap w-[46px]">
+                                            {m.date.slice(5).replace('-', '.')}
+                                          </td>
+                                          <td className="py-2 text-white/85">{opponent}</td>
+                                          <td className="py-2 text-right font-black text-base text-white whitespace-nowrap w-[48px]">
+                                            {gf}:{ga}
+                                          </td>
+                                          <td className="py-2 text-right w-[26px]">
+                                            {m.result && (
+                                              <span className="inline-grid place-items-center text-[11px] font-bold text-white"
+                                                style={{ width: 20, height: 20, backgroundColor: resultColors[m.result] }}>
+                                                {m.result}
+                                              </span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              ) : (
+                                <div className="text-[13px] py-1">
+                                  <p className="text-white/30 mb-2.5">
+                                    연결된 경기가 없습니다. 경기를 연결하면 전적과 득실이 자동으로 계산됩니다.
+                                  </p>
+                                  <button
+                                    onClick={() => requireAdmin(() => openLink(t))}
+                                    className="px-3 py-1.5 text-xs font-bold text-white hover:opacity-80 transition-opacity"
+                                    style={{ backgroundColor: '#CC0000' }}
+                                  >
+                                    ⚽ 경기 연결하기
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </li>
                       );
                     })}
