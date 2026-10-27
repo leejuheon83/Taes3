@@ -5,7 +5,7 @@ import { useAdminAuth } from '@/components/AdminAuth';
 import { SkeletonRows } from '@/components/Skeleton';
 import { db } from '@/lib/firebase';
 import {
-  collection, getDocs, doc, setDoc, deleteDoc, orderBy, query
+  collection, getDocs, doc, setDoc, deleteDoc, updateDoc, deleteField, orderBy, query
 } from 'firebase/firestore';
 
 type Match = {
@@ -20,7 +20,10 @@ type Match = {
   result: '승' | '무' | '패' | null;
   homeScore: number | null;
   awayScore: number | null;
+  tournamentId?: string;
 };
+
+type TournamentRef = { id: string; name: string; from: string; to: string };
 
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -39,6 +42,11 @@ const emptyForm = {
 
 const resultColors: Record<string, string> = { 승: '#16a34a', 패: '#dc2626', 무: '#6b7280' };
 
+/** 대회 연결이 있는 경우에만 tournamentId를 담은 객체를 돌려준다 (undefined 필드 저장 방지) */
+function pickTournamentId(m?: Match) {
+  return m?.tournamentId ? { tournamentId: m.tournamentId } : {};
+}
+
 function getDayFromDate(dateStr: string) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -55,6 +63,10 @@ export default function SchedulePage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // 대회 연결
+  const [tournaments, setTournaments] = useState<TournamentRef[]>([]);
+  const [linkMatch, setLinkMatch] = useState<Match | null>(null);
 
   useEffect(() => {
     async function loadMatches() {
@@ -73,8 +85,37 @@ export default function SchedulePage() {
         setLoading(false);
       }
     }
+    async function loadTournaments() {
+      try {
+        const snap = await getDocs(query(collection(db, 'tournaments'), orderBy('from', 'desc')));
+        setTournaments(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<TournamentRef, 'id'>) })));
+      } catch (err) {
+        console.error('Failed to load tournaments:', err);
+      }
+    }
     loadMatches();
+    loadTournaments();
   }, []);
+
+  const tournamentName = (id?: string) => tournaments.find(t => t.id === id)?.name;
+
+  /** 경기 하나의 대회 연결을 바꾼다. 경기 기록 자체는 건드리지 않는다. */
+  async function setMatchTournament(matchId: string, tournamentId: string | null) {
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'matches', matchId), {
+        tournamentId: tournamentId ?? deleteField(),
+      });
+      setMatches(prev => prev.map(m =>
+        m.id === matchId ? { ...m, tournamentId: tournamentId ?? undefined } : m));
+      setLinkMatch(null);
+    } catch (err) {
+      console.error('Failed to link tournament:', err);
+      alert('대회 연결에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const openAdd = () => {
     setEditId(null);
@@ -150,6 +191,8 @@ export default function SchedulePage() {
         result: hasResult ? (form.result as '승' | '무' | '패') : null,
         homeScore: hasResult ? Number(form.homeScore) : null,
         awayScore: hasResult ? Number(form.awayScore) : null,
+        // setDoc은 문서를 통째로 덮어쓰므로 기존 대회 연결을 직접 넘겨줘야 한다
+        ...(editId ? pickTournamentId(matches.find(m => m.id === editId)) : {}),
       };
 
       if (editId !== null) {
@@ -350,6 +393,9 @@ export default function SchedulePage() {
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="text-right text-xs text-white/30">
                       <div>📍 {m.venue}</div>
+                      {tournamentName(m.tournamentId) && (
+                        <div className="mt-1" style={{ color: '#ff8b84' }}>🏆 {tournamentName(m.tournamentId)}</div>
+                      )}
                       {!m.result && (
                         <div className="mt-1">
                           <span className="text-white text-[10px] font-bold px-2 py-0.5" style={{ backgroundColor: '#CC0000' }}>예정</span>
@@ -357,6 +403,17 @@ export default function SchedulePage() {
                       )}
                     </div>
                     <div className="flex flex-col gap-1">
+                      <button
+                        onClick={() => requireAdmin(() => setLinkMatch(m))}
+                        className="text-[10px] font-bold px-2 py-1 border transition-colors hover:brightness-125"
+                        style={{
+                          color: m.tournamentId ? '#ff8b84' : 'rgba(255,255,255,0.6)',
+                          borderColor: m.tournamentId ? 'rgba(204,0,0,0.5)' : 'rgba(255,255,255,0.1)',
+                        }}
+                        title={tournamentName(m.tournamentId) ?? '대회에 연결하기'}
+                      >
+                        🏆 대회
+                      </button>
                       <button
                         onClick={() => requireAdmin(() => openEdit(m), { reconfirm: true })}
                         className="text-[10px] font-bold px-2 py-1 text-white/60 hover:text-white border border-white/10 hover:border-white/30 transition-colors"
@@ -488,6 +545,58 @@ export default function SchedulePage() {
       )}
 
       {/* Delete confirm modal */}
+      {/* 대회 연결 */}
+      {linkMatch !== null && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center px-4 py-8 overflow-y-auto"
+          style={{ backgroundColor: 'rgba(0,0,0,0.92)' }}
+          onClick={e => { if (e.target === e.currentTarget) setLinkMatch(null); }}>
+          <div className="w-full max-w-md border border-white/10 p-5 my-auto" style={{ backgroundColor: '#111' }}>
+            <h2 className="text-white font-black text-lg">대회 연결</h2>
+            <p className="text-white/40 text-xs mt-1 mb-4">
+              {linkMatch.date} · <b className="text-white/70">{linkMatch.home} vs {linkMatch.away}</b>
+            </p>
+
+            {tournaments.length === 0 ? (
+              <p className="text-white/30 text-[13px] border border-white/10 px-3 py-7 text-center">
+                등록된 대회가 없습니다. 대회 지도에서 대회를 먼저 등록해 주세요.
+              </p>
+            ) : (
+              <ul className="border border-white/10 max-h-72 overflow-y-auto">
+                <li className="border-b border-white/5">
+                  <button type="button" disabled={saving}
+                    onClick={() => setMatchTournament(linkMatch.id, null)}
+                    className="w-full text-left px-3 py-2.5 hover:bg-white/5 transition-colors disabled:opacity-40"
+                    style={{ backgroundColor: linkMatch.tournamentId ? undefined : 'rgba(204,0,0,0.12)' }}>
+                    <span className="text-white/60 text-[13px]">연결 안 함</span>
+                  </button>
+                </li>
+                {tournaments.map(t => {
+                  const active = linkMatch.tournamentId === t.id;
+                  return (
+                    <li key={t.id} className="border-b border-white/5 last:border-0">
+                      <button type="button" disabled={saving}
+                        onClick={() => setMatchTournament(linkMatch.id, t.id)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-white/5 transition-colors disabled:opacity-40"
+                        style={{ backgroundColor: active ? 'rgba(204,0,0,0.12)' : undefined }}>
+                        <span className="block text-white text-[13px]">
+                          {t.name}{active && <span style={{ color: '#ff8b84' }}> · 연결됨</span>}
+                        </span>
+                        <span className="block text-white/35 text-[11px]">{t.from}{t.to && t.to !== t.from ? ` ~ ${t.to}` : ''}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            <button type="button" onClick={() => setLinkMatch(null)}
+              className="w-full mt-4 py-2.5 text-sm font-bold text-white/50 border border-white/20 hover:border-white/40 transition-colors">
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
+
       {deleteId !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
           <div className="w-full max-w-sm border border-white/10 p-6" style={{ backgroundColor: '#080808' }}>
