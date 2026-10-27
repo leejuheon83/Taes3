@@ -20,6 +20,12 @@ export async function GET(request: Request) {
 
   const restKey = process.env.KAKAO_REST_KEY;
   if (!restKey) {
+    // 임시 진단: 환경변수가 왜 안 보이는지 확인용. 이름만 기록하고 값은 절대 남기지 않는다.
+    console.error(
+      '[geocode] KAKAO_REST_KEY 없음. KAKAO 포함 변수명:',
+      JSON.stringify(Object.keys(process.env).filter(k => /KAKAO/i.test(k))),
+      '| VERCEL_ENV:', process.env.VERCEL_ENV,
+    );
     return NextResponse.json(
       { error: '카카오 API 키가 아직 설정되지 않았습니다. 좌표를 직접 입력해 주세요.' },
       { status: 503 },
