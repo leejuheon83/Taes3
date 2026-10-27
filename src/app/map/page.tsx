@@ -106,6 +106,8 @@ export default function MapPage() {
 
   const [activeYear, setActiveYear] = useState<string>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 선택과 별개로, 목록에서 세부 경기표를 펼쳐 둘지 여부
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showRoute, setShowRoute] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
@@ -134,7 +136,11 @@ export default function MapPage() {
         const loaded = tSnap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Tournament, 'id'>) }));
         setTournaments(loaded);
         setMatches(mSnap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Match, 'id'>) })));
-        if (loaded.length) setSelectedId(loaded[loaded.length - 1].id);
+        if (loaded.length) {
+          const latest = loaded[loaded.length - 1].id;
+          setSelectedId(latest);
+          setExpandedId(latest);
+        }
       } catch (err) {
         console.error('Failed to load tournaments:', err);
       } finally {
@@ -293,6 +299,7 @@ export default function MapPage() {
         return next.sort((a, b) => a.from.localeCompare(b.from));
       });
       setSelectedId(id);
+      setExpandedId(id);
       setShowModal(false);
     } catch (err) {
       console.error('Failed to save tournament:', err);
@@ -308,6 +315,7 @@ export default function MapPage() {
       await deleteDoc(doc(db, 'tournaments', id));
       setTournaments(prev => prev.filter(t => t.id !== id));
       setSelectedId(prev => (prev === id ? null : prev));
+      setExpandedId(prev => (prev === id ? null : prev));
       setDeleteId(null);
     } catch (err) {
       console.error('Failed to delete tournament:', err);
@@ -516,7 +524,7 @@ export default function MapPage() {
                       return (
                         <button
                           key={t.id}
-                          onClick={() => setSelectedId(t.id)}
+                          onClick={() => { setSelectedId(t.id); setExpandedId(t.id); }}
                           aria-pressed={isSel}
                           aria-label={`${t.name}, ${t.city}, ${t.stage}`}
                           className="absolute -translate-x-1/2 -translate-y-1/2 grid place-items-center"
@@ -660,17 +668,20 @@ export default function MapPage() {
                       const games = matchesByTournament.get(t.id) ?? [];
                       const rec = recordOf(games);
                       const isSel = t.id === selectedId;
+                      const isOpen = t.id === expandedId;
                       return (
                         <li key={t.id}>
                           <button
                             onClick={e => {
                               const el = e.currentTarget;
                               setSelectedId(t.id);
+                              // 같은 대회를 다시 누르면 세부 경기표를 접는다
+                              setExpandedId(prev => (prev === t.id ? null : t.id));
                               // 펼쳐진 내용이 목록 스크롤 밖으로 밀려나지 않게 한다
                               requestAnimationFrame(() =>
                                 el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
                             }}
-                            aria-expanded={isSel}
+                            aria-expanded={isOpen}
                             aria-pressed={isSel}
                             className="w-full text-left px-3 py-2.5 grid grid-cols-[1fr_auto] gap-x-3 items-center transition-colors"
                             style={{
@@ -678,7 +689,12 @@ export default function MapPage() {
                               borderLeft: `3px solid ${isSel ? '#CC0000' : 'transparent'}`,
                             }}
                           >
-                            <span className="text-[13.5px] text-white/90 break-words min-w-0">{t.name}</span>
+                            <span className="text-[13.5px] text-white/90 break-words min-w-0">
+                              <span aria-hidden="true" className="inline-block w-3 text-white/35 mr-0.5">
+                                {isOpen ? '▾' : '▸'}
+                              </span>
+                              {t.name}
+                            </span>
                             <span className="row-span-2 text-right">
                               <span className="block text-xs font-bold" style={{ color: stageColors[t.stage] }}>
                                 {t.stage}
@@ -692,7 +708,7 @@ export default function MapPage() {
                             </span>
                           </button>
 
-                          {isSel && (
+                          {isOpen && (
                             <div className="px-3 pt-1 pb-3"
                               style={{ backgroundColor: '#23191a', borderLeft: '3px solid #CC0000' }}>
                               {games.length ? (
