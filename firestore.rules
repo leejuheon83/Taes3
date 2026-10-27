@@ -1,8 +1,168 @@
 rules_version = '2';
+
+// TAES FC — Firestore 보안 규칙
+//
+// 이 앱에는 Firebase Auth가 없다. 관리자 확인은 클라이언트 쪽 비밀번호로만 이뤄지므로
+// 규칙에서 request.auth로 관리자를 구분할 수 없다. 따라서 이 규칙의 목표는
+// '관리자만 쓰기'가 아니라 피해 범위를 줄이는 것이다.
+//
+//   O 막는 것 — 앱이 쓰지 않는 경로에 임의 컬렉션 생성, 정의되지 않은 필드,
+//              타입이 틀린 값, 초대형 문서
+//   X 못 막는 것 — 읽기와 삭제. 형식만 맞으면 쓰기도 막지 못한다.
+//
+// 읽기·삭제까지 막으려면 Firebase Auth를 붙이거나, 쓰기를 서버
+// (Route Handler + Admin SDK)로 옮겨야 한다. 규칙만으로는 불가능하다.
+//
+// Firestore는 기본이 거부이므로, 여기에 적히지 않은 경로는 자동으로 차단된다.
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    function d() {
+      return request.resource.data;
+    }
+
+    // 정의된 필드만 쓰되, required는 반드시 포함
+    function fields(required, optional) {
+      return d().keys().hasAll(required)
+          && d().keys().hasOnly(required.concat(optional));
+    }
+
+    // ── 공지사항 ──
+    match /notices/{noticeId} {
+      allow read: if true;
+      allow create, update: if
+           fields(['category', 'title', 'content', 'date', 'author', 'views', 'pinned'], [])
+        && d().category is string && d().category.size() <= 40
+        && d().title is string && d().title.size() <= 200
+        && d().content is string && d().content.size() <= 50000
+        && d().date is string && d().date.size() <= 40
+        && d().author is string && d().author.size() <= 60
+        && d().views is number
+        && d().pinned is bool;
+      allow delete: if true;
+    }
+
+    // ── 경기 일정·결과 ──
+    match /matches/{matchId} {
+      allow read: if true;
+      allow create, update: if
+           fields(['date', 'day', 'time', 'home', 'away', 'venue', 'grade',
+                   'result', 'homeScore', 'awayScore'], ['tournamentId'])
+        && d().date is string && d().date.size() <= 40
+        && d().day is string && d().day.size() <= 10
+        && d().time is string && d().time.size() <= 10
+        && d().home is string && d().home.size() <= 80
+        && d().away is string && d().away.size() <= 80
+        && d().venue is string && d().venue.size() <= 120
+        && d().grade is string && d().grade.size() <= 40
+        && (d().result == null || d().result in ['승', '무', '패'])
+        && (d().homeScore == null || d().homeScore is number)
+        && (d().awayScore == null || d().awayScore is number)
+        && (!('tournamentId' in d()) ||
+            (d().tournamentId is string && d().tournamentId.size() <= 60));
+      allow delete: if true;
+    }
+
+    // ── 대회 (대회 지도) ──
+    match /tournaments/{tournamentId} {
+      allow read: if true;
+      allow create, update: if
+           fields(['name', 'city', 'venue', 'lat', 'lng', 'from', 'to', 'stage'], [])
+        && d().name is string && d().name.size() <= 150
+        && d().city is string && d().city.size() <= 40
+        && d().venue is string && d().venue.size() <= 150
+        && d().from is string && d().from.size() <= 40
+        && d().to is string && d().to.size() <= 40
+        // 한반도 범위를 벗어난 좌표는 지도 밖으로 나가므로 막는다
+        && d().lat is number && d().lat >= 33.0 && d().lat <= 39.0
+        && d().lng is number && d().lng >= 124.0 && d().lng <= 132.0
+        && d().stage in ['우승', '준우승', '4강', '8강', '16강', '조별'];
+      allow delete: if true;
+    }
+
+    // ── 선수 ──
+    match /players/{playerId} {
+      allow read: if true;
+      allow create, update: if
+           fields(['no', 'name', 'pos', 'positions', 'grade', 'honorary', 'captain', 'stats'],
+                  ['photo', 'modelPhoto', 'photoURL', 'modelPhotoURL'])
+        && d().no is number
+        && d().name is string && d().name.size() <= 60
+        && d().pos is string && d().pos.size() <= 20
+        && d().positions is list && d().positions.size() <= 4
+        && d().grade is string && d().grade.size() <= 20
+        && d().honorary is bool
+        && d().captain is bool
+        && d().stats is map && d().stats.keys().size() <= 10
+        && (!('photo' in d()) || d().photo == null ||
+            (d().photo is string && d().photo.size() <= 900000))
+        && (!('modelPhoto' in d()) || d().modelPhoto == null ||
+            (d().modelPhoto is string && d().modelPhoto.size() <= 900000))
+        && (!('photoURL' in d()) || d().photoURL == null ||
+            (d().photoURL is string && d().photoURL.size() <= 900000))
+        && (!('modelPhotoURL' in d()) || d().modelPhotoURL == null ||
+            (d().modelPhotoURL is string && d().modelPhotoURL.size() <= 900000));
+      allow delete: if true;
+    }
+
+    // ── 코칭스태프 ──
+    match /staff/{staffId} {
+      allow read: if true;
+      allow create, update: if
+           fields(['name', 'role', 'career', 'order', 'photoURL'], [])
+        && d().name is string && d().name.size() <= 60
+        && d().role is string && d().role.size() <= 60
+        && d().career is string && d().career.size() <= 5000
+        && d().order is number
+        && (d().photoURL == null ||
+            (d().photoURL is string && d().photoURL.size() <= 900000));
+      allow delete: if true;
+    }
+
+    // ── 영상 ──
+    match /videos/{videoId} {
+      allow read: if true;
+      allow create, update: if
+           fields(['title', 'date', 'grade', 'description', 'youtubeId'], ['duration'])
+        && d().title is string && d().title.size() <= 200
+        && d().date is string && d().date.size() <= 40
+        && d().grade is string && d().grade.size() <= 40
+        && d().description is string && d().description.size() <= 5000
+        && d().youtubeId is string && d().youtubeId.size() <= 40
+        && (!('duration' in d()) ||
+            (d().duration is string && d().duration.size() <= 20));
+      allow delete: if true;
+    }
+
+    // ── 앨범 ──
+    match /albums/{albumId} {
+      allow read: if true;
+      allow create, update: if
+           fields(['title', 'date', 'items'], ['grade'])
+        && d().title is string && d().title.size() <= 200
+        && d().date is string && d().date.size() <= 40
+        && d().items is list && d().items.size() <= 500
+        && (!('grade' in d()) || (d().grade is string && d().grade.size() <= 40));
+      allow delete: if true;
+
+      // 사진 1장 = 문서 1개 (base64 본문)
+      match /photos/{photoId} {
+        allow read: if true;
+        allow create, update: if
+             fields(['data', 'name'], [])
+          && d().data is string && d().data.size() <= 900000
+          && d().name is string && d().name.size() <= 300;
+        allow delete: if true;
+      }
+    }
+
+    // ── 사이트 설정 (단일 문서) ──
+    // featuredPhoto / featuredVideo 를 merge 로 쓴다. 필드가 늘어날 수 있어 느슨하게 둔다.
+    match /settings/main {
+      allow read: if true;
+      allow create, update: if d().keys().size() <= 20;
+      allow delete: if false;
     }
   }
 }

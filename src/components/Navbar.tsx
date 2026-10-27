@@ -17,6 +17,7 @@ const navItems = [
     children: [
       { label: '경기 일정', href: '/schedule' },
       { label: '경기 결과', href: '/schedule?tab=results' },
+      { label: '대회 지도', href: '/map' },
     ],
   },
   {
