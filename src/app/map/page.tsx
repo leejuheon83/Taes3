@@ -8,8 +8,8 @@ import {
   collection, getDocs, doc, setDoc, deleteDoc, orderBy, query, writeBatch, deleteField
 } from 'firebase/firestore';
 import {
-  MAINLAND, JEJU, HOME, VIEW_W, VIEW_H,
-  project, projectPercent, ringToPath, distanceKm,
+  MAINLAND, JEJU, HOME,
+  project, fitView, toPercent, ringToPath, distanceKm,
 } from '@/lib/korea';
 
 const STAGES = ['우승', '준우승', '4강', '8강', '16강', '조별'] as const;
@@ -197,6 +197,13 @@ export default function MapPage() {
     1,
     ...visible.map(t => (matchesByTournament.get(t.id) ?? []).length),
   );
+
+  // 대회가 몰려 있는 지역으로 지도를 확대한다 (홈 포함). 연도 필터가 바뀌면 다시 맞춘다.
+  const view = useMemo(
+    () => fitView([HOME, ...visible].map(p => project(p.lat, p.lng))),
+    [visible],
+  );
+  const pct = (lat: number, lng: number) => toPercent(view, project(lat, lng));
 
   const routePath = useMemo(() => {
     if (!showRoute || visible.length < 2) return '';
@@ -487,32 +494,35 @@ export default function MapPage() {
               <section className="border border-white/10" style={{ backgroundColor: '#0f1012' }}>
                 <div
                   className="relative mx-auto w-full"
-                  style={{ maxWidth: 400, aspectRatio: `${VIEW_W} / ${VIEW_H}`, backgroundColor: '#080a0d' }}
+                  style={{ maxWidth: 400, aspectRatio: `${view.w} / ${view.h}`, backgroundColor: '#080a0d' }}
                 >
                   <svg
-                    viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+                    viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
                     preserveAspectRatio="xMidYMid meet"
                     className="absolute inset-0 w-full h-full"
                     aria-hidden="true"
                   >
                     {[MAINLAND, JEJU].map((ring, i) => (
-                      <path key={i} d={ringToPath(ring)} fill="#1b1e23" stroke="rgba(204,0,0,.45)" strokeWidth="1.1" />
+                      <path key={i} d={ringToPath(ring)} fill="#1b1e23" stroke="rgba(204,0,0,.45)" strokeWidth="1.1"
+                        vectorEffect="non-scaling-stroke" />
                     ))}
                     {routePath && (
                       <path d={routePath} fill="none" stroke="rgba(204,0,0,.5)" strokeWidth="1.6"
-                        strokeDasharray="5 5" strokeLinejoin="round" strokeLinecap="round" />
+                        strokeDasharray="5 5" strokeLinejoin="round" strokeLinecap="round"
+                        vectorEffect="non-scaling-stroke" />
                     )}
                   </svg>
 
                   <div className="absolute inset-0">
                     {/* 홈 */}
                     <div className="absolute -translate-x-1/2 -translate-y-1/2 grid place-items-center"
-                      style={{ ...projectPercent(HOME.lat, HOME.lng), zIndex: 1 }}>
+                      style={{ ...pct(HOME.lat, HOME.lng), zIndex: 1 }}>
                       <span className="rounded-full bg-white"
                         style={{ width: 11, height: 11, border: '2px solid #050505', boxShadow: '0 0 0 1px rgba(255,255,255,.14)' }} />
                       <span className="absolute rounded-full border border-dashed border-white/35" style={{ width: 28, height: 28 }} />
-                      <span className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-bold text-white"
-                        style={{ bottom: 'calc(100% + 6px)', textShadow: '0 1px 3px #050505, 0 0 6px #050505' }}>
+                      {/* 홈 글자는 점 왼쪽에 둔다 — 확대 보기에서 위쪽 대회 번호와 겹치지 않게 */}
+                      <span className="absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] font-bold text-white"
+                        style={{ right: 'calc(100% + 9px)', textShadow: '0 1px 3px #050505, 0 0 6px #050505' }}>
                         홈 · {HOME.city}
                       </span>
                     </div>
@@ -528,7 +538,7 @@ export default function MapPage() {
                           aria-pressed={isSel}
                           aria-label={`${t.name}, ${t.city}, ${t.stage}`}
                           className="absolute -translate-x-1/2 -translate-y-1/2 grid place-items-center"
-                          style={{ ...projectPercent(t.lat, t.lng), width: size, height: size, zIndex: 2 }}
+                          style={{ ...pct(t.lat, t.lng), width: size, height: size, zIndex: 2 }}
                         >
                           <span
                             className="rounded-full transition-transform"
@@ -548,7 +558,7 @@ export default function MapPage() {
                             {i + 1}
                           </span>
                           <span
-                            className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] pointer-events-none"
+                            className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] pointer-events-none ${isSel ? '' : 'hidden sm:block'}`}
                             style={{
                               top: 'calc(100% + 3px)',
                               color: isSel ? '#fff' : 'rgba(255,255,255,.62)',
@@ -669,6 +679,7 @@ export default function MapPage() {
                       const rec = recordOf(games);
                       const isSel = t.id === selectedId;
                       const isOpen = t.id === expandedId;
+                      const no = visible.indexOf(t) + 1;   // 지도 위 번호와 같다
                       return (
                         <li key={t.id}>
                           <button
@@ -692,6 +703,13 @@ export default function MapPage() {
                             <span className="text-[13.5px] text-white/90 break-words min-w-0">
                               <span aria-hidden="true" className="inline-block w-3 text-white/35 mr-0.5">
                                 {isOpen ? '▾' : '▸'}
+                              </span>
+                              <span
+                                className="inline-grid place-items-center align-[-2px] mr-1.5 text-[10px] font-bold text-white rounded-full"
+                                style={{ width: 17, height: 17, backgroundColor: stageColors[t.stage] ?? '#6b7280', border: '1.5px solid rgba(5,5,5,.85)' }}
+                                aria-label={`지도 ${no}번`}
+                              >
+                                {no}
                               </span>
                               {t.name}
                             </span>

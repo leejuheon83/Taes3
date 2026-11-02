@@ -18,6 +18,37 @@ export function projectPercent(lat: number, lng: number): { left: string; top: s
   return { left: `${(x / VIEW_W) * 100}%`, top: `${(y / VIEW_H) * 100}%` };
 }
 
+export type ViewBox = { x: number; y: number; w: number; h: number };
+export const FULL_VIEW: ViewBox = { x: 0, y: 0, w: VIEW_W, h: VIEW_H };
+
+/**
+ * 점들이 모두 들어오는 정사각형 보기 영역을 돌려준다.
+ * 대회가 수도권처럼 한곳에 몰려 있으면 전국 지도에서 점이 겹쳐 보이므로, 그 지역으로 확대한다.
+ * 점이 없거나 전국에 퍼져 있으면 전국 보기(FULL_VIEW)를 쓴다.
+ * 단위: project()의 SVG 좌표 (1 ≈ 1.1km). minSize 110 ≈ 120km.
+ */
+export function fitView(points: [number, number][], opts?: { pad?: number; minSize?: number }): ViewBox {
+  if (!points.length) return FULL_VIEW;
+  const pad = opts?.pad ?? 0.22;
+  const minSize = opts?.minSize ?? 110;
+  const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const size = Math.max((x1 - x0) * (1 + 2 * pad), (y1 - y0) * (1 + 2 * pad), minSize);
+  if (size >= Math.max(VIEW_W, VIEW_H) * 0.9) return FULL_VIEW;
+  const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, Math.min(lo, hi)), Math.max(lo, hi));
+  return {
+    x: clamp((x0 + x1) / 2 - size / 2, 0, VIEW_W - size),
+    y: clamp((y0 + y1) / 2 - size / 2, 0, VIEW_H - size),
+    w: size,
+    h: size,
+  };
+}
+
+/** 보기 영역 기준으로 투영 좌표를 컨테이너 퍼센트로 바꾼다 (HTML 마커 배치용). */
+export function toPercent(view: ViewBox, [x, y]: [number, number]): { left: string; top: string } {
+  return { left: `${((x - view.x) / view.w) * 100}%`, top: `${((y - view.y) / view.h) * 100}%` };
+}
+
 type Ring = [number, number][];
 
 /** 위경도 고리를 닫힌 SVG path 문자열로 만든다. */
