@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
+import MusicButton from '@/components/MusicButton';
 
 const USER_AUTH_KEY = 'taes-user-login';
 
@@ -168,6 +169,11 @@ export default function Navbar() {
             ))}
           </div>
 
+          {/* 음악 끄기·켜기 — 데스크탑은 글자 포함, 모바일은 햄버거 옆에 아이콘만 */}
+          <div className="hidden lg:flex items-center ml-3">
+            <MusicButton />
+          </div>
+
           {/* 로그인/로그아웃 버튼 (데스크탑) */}
           <div className="hidden lg:flex items-center ml-3">
             {isLoggedIn ? (
@@ -196,7 +202,9 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile hamburger */}
+          {/* Mobile: 음악 버튼 + hamburger */}
+          <div className="lg:hidden flex items-center gap-1">
+            <MusicButton />
           <button
             className="lg:hidden text-white p-2 flex flex-col justify-center items-center w-10 h-10 gap-0"
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -206,6 +214,7 @@ export default function Navbar() {
             <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${mobileOpen ? 'opacity-0 scale-x-0' : 'opacity-100'}`} />
             <div className={`w-6 h-0.5 bg-white transition-all duration-300 origin-center ${mobileOpen ? '-rotate-45 -translate-y-[4px]' : 'translate-y-1'}`} />
           </button>
+          </div>
         </div>
       </div>
 

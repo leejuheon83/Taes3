@@ -657,3 +657,29 @@ body {
 .mini-card .fcard__note { font-size: 4.6cqw; }
 .mini-card .fcard__note-lab { font-size: 3.4cqw; letter-spacing: .12em; }
 @media (prefers-reduced-motion: reduce) { .mini-card:hover { transform: none; } }
+
+/* ── 상단 메뉴의 음악 끄기·켜기 버튼 ── */
+.nav-music {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 0;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: border-color .2s ease, background-color .2s ease, color .2s ease;
+}
+.nav-music:hover { color: #fff; border-color: rgba(255, 255, 255, 0.45); }
+.nav-music[data-on="true"] { color: #fff; border-color: #ff3b25; background: rgba(204, 0, 0, 0.16); }
+/* 모바일: 글자는 숨기고 아이콘만 (터치하기 편하게 40px) */
+@media (max-width: 1023px) {
+  .nav-music { width: 40px; height: 40px; padding: 0; justify-content: center; gap: 0; }
+  .nav-music__text { display: none; }
+  .nav-music .music-bars { display: none; }
+}
