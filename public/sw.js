@@ -19,6 +19,8 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  // 음악·영상처럼 부분 요청(Range)으로 받는 큰 파일은 캐시하지 않고 그대로 통과시킨다
+  if (event.request.headers.has('range') || event.request.destination === 'audio') return;
   event.respondWith(
     fetch(event.request)
       .then((res) => {
