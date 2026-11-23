@@ -63,7 +63,7 @@ export function initMusic() {
 
   const a = new Audio(MUSIC_SRC);
   a.loop = true;
-  a.preload = 'auto';
+  a.preload = 'metadata';   // 휴대폰은 어차피 미리 받지 않는다. 재생을 시도하면 그때 받는다
   a.volume = 0;
   audio = a;
 
@@ -84,11 +84,17 @@ export function initMusic() {
 
   a.addEventListener('play', () => set({ playing: true }));
   a.addEventListener('pause', () => set({ playing: false }));
-  a.addEventListener('error', () => set({ available: false }));
-  a.addEventListener('canplay', () => {
-    set({ available: true });
-    if (want) start().then(() => { if (a.paused) addGesture(); });
-  }, { once: true });
+  a.addEventListener('error', () => { removeGesture(); set({ available: false, playing: false }); });
+
+  // 버튼 표시는 음악이 내려받아졌는지와 상관없다. 휴대폰 브라우저는 재생을 시도하기 전까지
+  // 파일을 받지 않아서, 로딩 완료를 기다리면 버튼이 영영 나타나지 않는다.
+  // 파일이 실제로 있는지만 가볍게 확인한다 (HEAD 요청, 내용은 받지 않음).
+  fetch(MUSIC_SRC, { method: 'HEAD' })
+    .then(r => { if (r.ok) set({ available: true }); })
+    .catch(() => { /* 오프라인이면 버튼을 숨긴 채로 둔다 */ });
+
+  // 접속하자마자 재생을 시도하고, 막히면 첫 사용자 동작을 기다린다
+  if (want) start().then(() => { if (a.paused) addGesture(); });
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) a.pause();
