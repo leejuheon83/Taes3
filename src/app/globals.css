@@ -633,22 +633,68 @@ body {
 .mini-card .fcard__note-lab { font-size: 3.4cqw; letter-spacing: .12em; }
 @media (prefers-reduced-motion: reduce) { .mini-card:hover { transform: none; } }
 
-/* ── 상단 빨간 줄의 작은 음악 끄기·켜기 버튼 ── */
+/* ── 상단 빨간 줄의 음악 끄기·켜기 버튼 ──
+   빨간 줄 위에서 눈에 띄도록: 재생 중은 흰 바탕 + 붉은 아이콘, 꺼짐은 어두운 바탕 + 흰 아이콘 */
 .nav-music {
   position: relative;
   display: inline-grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   min-height: 0;
   padding: 0;
   border-radius: 999px;
-  color: rgba(255, 255, 255, 0.78);
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+  color: #fff;
+  background: rgba(20, 0, 0, 0.55);
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  transition: background-color .2s ease, color .2s ease, transform .15s ease;
 }
-/* 눈에는 작지만 손가락으로는 누르기 쉽게 눌림 영역만 넓힌다 */
+/* 눈에는 작아도 손가락으로는 누르기 쉽게 눌림 영역만 넓힌다 */
 .nav-music::after { content: ''; position: absolute; inset: -9px; }
-.nav-music:hover { color: #fff; background: rgba(0, 0, 0, 0.4); border-color: rgba(255, 255, 255, 0.55); }
-.nav-music[data-on="true"] { color: #fff; border-color: rgba(255, 255, 255, 0.7); }
+.nav-music:hover { background: rgba(20, 0, 0, 0.8); transform: scale(1.06); }
+.nav-music[data-on="true"] { color: #cc0000; background: #fff; border-color: #fff; }
+.nav-music[data-on="true"]:hover { background: #fff3f0; }
+/* 소리를 기다리는 중(자동재생이 막힘): 눈길을 끄는 파동 */
+.nav-music[data-hint="true"]::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  border: 2px solid #ffd76a;
+  animation: nav-music-ping 1.5s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes nav-music-ping {
+  0%   { transform: scale(1);   opacity: .95; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+/* 자동재생이 막혔을 때 잠깐 뜨는 안내 */
+.music-hint {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(12, 4, 4, 0.92);
+  border: 1px solid rgba(255, 90, 60, 0.6);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  animation: music-hint-in .35s ease both;
+}
+@keyframes music-hint-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-music[data-hint="true"]::before { animation: none; opacity: .9; }
+  .music-hint { animation: none; }
+}

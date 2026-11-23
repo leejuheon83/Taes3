@@ -4,7 +4,7 @@ import { useMusic, MUSIC_CONTROL_ATTR } from '@/lib/music';
 
 /** 상단 빨간 줄 오른쪽 끝의 작은 음악 끄기·켜기 버튼. 음원이 없으면 보이지 않는다. */
 export default function MusicButton() {
-  const { available, playing, toggle } = useMusic();
+  const { available, playing, blocked, toggle } = useMusic();
   if (!available) return null;
 
   const label = playing ? '배경음악 끄기' : '배경음악 켜기';
@@ -18,8 +18,9 @@ export default function MusicButton() {
       title={label}
       className="nav-music"
       data-on={playing ? 'true' : 'false'}
+      data-hint={blocked ? 'true' : 'false'}
     >
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2"
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2"
         strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M4 9.5v5h3.6L12.5 19V5L7.6 9.5H4z" fill="currentColor" stroke="none" />
         {playing ? (

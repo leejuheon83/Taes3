@@ -20,8 +20,9 @@ const FADE_MS = 1800;
 /** 소리 버튼 자신을 누른 동작은 "첫 터치로 시작"에서 제외한다 (누르자마자 꺼지는 것을 막음) */
 export const MUSIC_CONTROL_ATTR = 'data-music-control';
 
-type Snapshot = { available: boolean; playing: boolean };
-const SERVER_SNAPSHOT: Snapshot = { available: false, playing: false };
+/** blocked: 듣고 싶은데 브라우저가 자동재생을 막아 첫 터치를 기다리는 중 */
+type Snapshot = { available: boolean; playing: boolean; blocked: boolean };
+const SERVER_SNAPSHOT: Snapshot = { available: false, playing: false, blocked: false };
 
 let snapshot: Snapshot = SERVER_SNAPSHOT;
 const listeners = new Set<() => void>();
@@ -32,7 +33,7 @@ let fadeRaf: number | null = null;
 
 function set(next: Partial<Snapshot>) {
   const merged = { ...snapshot, ...next };
-  if (merged.available === snapshot.available && merged.playing === snapshot.playing) return;
+  if (merged.available === snapshot.available && merged.playing === snapshot.playing && merged.blocked === snapshot.blocked) return;
   snapshot = merged;
   listeners.forEach(l => l());
 }
@@ -70,21 +71,23 @@ export function initMusic() {
   const start = (): Promise<void> => {
     if (!want || !a.paused) return Promise.resolve();
     a.volume = 0;
-    return a.play().then(() => fadeIn(a)).catch(() => { /* 막힘: 첫 동작을 기다린다 */ });
+    return a.play().then(() => fadeIn(a)).catch(() => { if (want) set({ blocked: true }); });
   };
 
   const onGesture = (e: Event) => {
     if ((e.target as Element | null)?.closest?.(`[${MUSIC_CONTROL_ATTR}]`)) return;
-    if (!want) { removeGesture(); return; }
+    if (!want) { removeGesture(); set({ blocked: false }); return; }
     start().then(() => { if (!a.paused) removeGesture(); });
   };
-  const events = ['pointerdown', 'touchend', 'keydown'] as const;
+  // 브라우저가 '사용자 동작'으로 인정하는 입력들. 기기마다 인정하는 게 달라 여럿을 함께 건다
+  // (iOS 사파리는 touchend·click, 크롬은 pointerdown·pointerup·키 입력). 스크롤은 인정되지 않는다.
+  const events = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as const;
   const addGesture = () => events.forEach(ev => window.addEventListener(ev, onGesture, { capture: true, passive: true }));
   const removeGesture = () => events.forEach(ev => window.removeEventListener(ev, onGesture, { capture: true }));
 
-  a.addEventListener('play', () => set({ playing: true }));
+  a.addEventListener('play', () => set({ playing: true, blocked: false }));
   a.addEventListener('pause', () => set({ playing: false }));
-  a.addEventListener('error', () => { removeGesture(); set({ available: false, playing: false }); });
+  a.addEventListener('error', () => { removeGesture(); set({ available: false, playing: false, blocked: false }); });
 
   // 버튼 표시는 음악이 내려받아졌는지와 상관없다. 휴대폰 브라우저는 재생을 시도하기 전까지
   // 파일을 받지 않아서, 로딩 완료를 기다리면 버튼이 영영 나타나지 않는다.
@@ -109,6 +112,7 @@ export function toggleMusic() {
   if (!a.paused) {
     want = false;
     a.pause();
+    set({ blocked: false });
     savePref(false);
   } else {
     want = true;
