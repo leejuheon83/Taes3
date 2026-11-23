@@ -79,7 +79,7 @@ export default function Navbar() {
       }`}
     >
       {/* Top bar */}
-      <div className="py-1.5 px-4" style={{
+      <div className="relative py-1.5 px-4" style={{
         background: 'linear-gradient(90deg, #7a0000 0%, #cc0000 22%, #e11400 50%, #cc0000 78%, #7a0000 100%)',
         borderBottom: '1px solid rgba(0,0,0,0.55)',
       }}>
@@ -91,6 +91,10 @@ export default function Navbar() {
             style={{ color: '#ffd76a', textShadow: '0 1px 2px rgba(0,0,0,0.45)' }}>
             <span className="inline-block animate-pulse">❤️</span> 엄마, 아빠가 응원합니다.
           </span>
+        </div>
+        {/* 음악 끄기·켜기 — 작게, 줄 오른쪽 끝 */}
+        <div className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 flex items-center">
+          <MusicButton />
         </div>
       </div>
 
@@ -169,11 +173,6 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* 음악 끄기·켜기 — 데스크탑은 글자 포함, 모바일은 햄버거 옆에 아이콘만 */}
-          <div className="hidden lg:flex items-center ml-3">
-            <MusicButton />
-          </div>
-
           {/* 로그인/로그아웃 버튼 (데스크탑) */}
           <div className="hidden lg:flex items-center ml-3">
             {isLoggedIn ? (
@@ -202,9 +201,7 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile: 음악 버튼 + hamburger */}
-          <div className="lg:hidden flex items-center gap-1">
-            <MusicButton />
+          {/* Mobile hamburger */}
           <button
             className="lg:hidden text-white p-2 flex flex-col justify-center items-center w-10 h-10 gap-0"
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -214,7 +211,6 @@ export default function Navbar() {
             <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${mobileOpen ? 'opacity-0 scale-x-0' : 'opacity-100'}`} />
             <div className={`w-6 h-0.5 bg-white transition-all duration-300 origin-center ${mobileOpen ? '-rotate-45 -translate-y-[4px]' : 'translate-y-1'}`} />
           </button>
-          </div>
         </div>
       </div>
 

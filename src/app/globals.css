@@ -294,27 +294,6 @@ body {
   .skeleton-block::after { animation: none; }
 }
 
-/* ── 배경음악 토글 버튼 ── */
-.music-toggle {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 0;
-  padding: 9px 13px;
-  border: 1px solid;
-  border-radius: 999px;
-  background: rgba(10, 6, 6, 0.82);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-  transition: border-color 0.2s ease, transform 0.15s ease;
-}
-.music-toggle:hover { transform: translateY(-2px); }
-.music-toggle:active { transform: translateY(0); }
-
 /* 재생 중 표시용 막대 */
 .music-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
 .music-bars i {
@@ -332,10 +311,6 @@ body {
 }
 @media (prefers-reduced-motion: reduce) { .music-bars i { animation: none; } }
 
-/* 모바일에서는 조금 더 안쪽으로 */
-@media (max-width: 640px) {
-  .music-toggle { right: 12px; bottom: 12px; padding: 8px 11px; }
-}
 
 /* ── 카드 (프레임 그림 기반) ── */
 /* 색은 변수로만 바꾼다: 프레임 그림 + 강조색 한 벌 */
@@ -658,28 +633,22 @@ body {
 .mini-card .fcard__note-lab { font-size: 3.4cqw; letter-spacing: .12em; }
 @media (prefers-reduced-motion: reduce) { .mini-card:hover { transform: none; } }
 
-/* ── 상단 메뉴의 음악 끄기·켜기 버튼 ── */
+/* ── 상단 빨간 줄의 작은 음악 끄기·켜기 버튼 ── */
 .nav-music {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   min-height: 0;
-  height: 34px;
-  padding: 0 11px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  transition: border-color .2s ease, background-color .2s ease, color .2s ease;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease;
 }
-.nav-music:hover { color: #fff; border-color: rgba(255, 255, 255, 0.45); }
-.nav-music[data-on="true"] { color: #fff; border-color: #ff3b25; background: rgba(204, 0, 0, 0.16); }
-/* 모바일: 글자는 숨기고 아이콘만 (터치하기 편하게 40px) */
-@media (max-width: 1023px) {
-  .nav-music { width: 40px; height: 40px; padding: 0; justify-content: center; gap: 0; }
-  .nav-music__text { display: none; }
-  .nav-music .music-bars { display: none; }
-}
+/* 눈에는 작지만 손가락으로는 누르기 쉽게 눌림 영역만 넓힌다 */
+.nav-music::after { content: ''; position: absolute; inset: -9px; }
+.nav-music:hover { color: #fff; background: rgba(0, 0, 0, 0.4); border-color: rgba(255, 255, 255, 0.55); }
+.nav-music[data-on="true"] { color: #fff; border-color: rgba(255, 255, 255, 0.7); }

@@ -27,7 +27,7 @@ const sairaCondensed = Saira_Condensed({
 });
 import Navbar from "@/components/Navbar";
 import PWARegister from "@/components/PWARegister";
-import MusicToggle from "@/components/MusicToggle";
+import MusicPlayer from "@/components/MusicPlayer";
 
 export const metadata: Metadata = {
   title: "TAES FC PREMIER | 태즈 FC 프리미어",
@@ -61,7 +61,7 @@ export default function RootLayout({
     <html lang="ko" className={`h-full ${notoSansKR.variable} ${blackHanSans.variable} ${sairaCondensed.variable}`}>
       <body className="min-h-full flex flex-col text-white antialiased" style={{ backgroundColor: '#080808' }}>
         <PWARegister />
-        <MusicToggle />
+        <MusicPlayer />
         <Navbar />
         <main className="flex-1 pt-[88px]">
           {children}
