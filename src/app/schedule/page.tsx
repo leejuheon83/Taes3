@@ -23,6 +23,9 @@ type Match = {
   result: '승' | '무' | '패' | null;
   homeScore: number | null;
   awayScore: number | null;
+  /** 승부차기 점수. 승부차기까지 간 경기에만 있다. */
+  homePk?: number;
+  awayPk?: number;
   tournamentId?: string;
 };
 
@@ -41,9 +44,24 @@ const emptyForm = {
   result: '' as '' | '승' | '무' | '패',
   homeScore: '',
   awayScore: '',
+  hasPk: false,
+  homePk: '',
+  awayPk: '',
 };
 
 const resultColors: Record<string, string> = { 승: '#16a34a', 패: '#dc2626', 무: '#6b7280' };
+
+/** 승부차기 점수가 양쪽 모두 들어오면, TAES 기준으로 결과(승·패)를 맞춘다. */
+function withPkResult<F extends { home: string; homePk: string; awayPk: string; result: '' | '승' | '무' | '패' }>(f: F): F {
+  if (f.homePk === '' || f.awayPk === '') return f;
+  const h = Number(f.homePk), a = Number(f.awayPk);
+  if (h === a) return f;
+  const taesIsHome = f.home.includes('TAES');
+  return { ...f, result: (h > a) === taesIsHome ? '승' : '패' };
+}
+
+/** 승부차기 점수가 양쪽 모두 기록된 경기인지 */
+const hasPk = (m: { homePk?: number; awayPk?: number }) => m.homePk != null && m.awayPk != null;
 
 /** 대회 연결이 있는 경우에만 tournamentId를 담은 객체를 돌려준다 (undefined 필드 저장 방지) */
 function pickTournamentId(m?: Match) {
@@ -178,16 +196,31 @@ function ScheduleContent() {
       result: m.result ?? '',
       homeScore: m.homeScore?.toString() ?? '',
       awayScore: m.awayScore?.toString() ?? '',
+      hasPk: m.homePk != null && m.awayPk != null,
+      homePk: m.homePk?.toString() ?? '',
+      awayPk: m.awayPk?.toString() ?? '',
     });
     setShowModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const hasResult = form.hasResult;
+    // 승부차기: 두 칸을 모두 채워야 하고, 동점으로 끝날 수 없다
+    const hasPk = hasResult && form.hasPk;
+    if (hasPk) {
+      if (form.homePk === '' || form.awayPk === '') { alert('승부차기 점수를 양쪽 모두 입력해 주세요.'); return; }
+      if (Number(form.homePk) === Number(form.awayPk)) { alert('승부차기는 동점으로 끝날 수 없습니다. 점수를 확인해 주세요.'); return; }
+    }
+    // 결과 입력을 켰으면 승·무·패와 득점이 있어야 한다.
+    // (예전에는 승·무·패를 고르지 않으면 입력한 점수가 말없이 버려지고 예정 경기로 저장됐다)
+    if (hasResult) {
+      if (form.result === '') { alert('결과(승·무·패)를 선택해 주세요.'); return; }
+      if (form.homeScore === '' || form.awayScore === '') { alert('홈과 원정 득점을 모두 입력해 주세요.'); return; }
+    }
     setSaving(true);
     try {
       const day = getDayFromDate(form.date);
-      const hasResult = form.hasResult && form.result !== '';
 
       const matchData: Omit<Match, 'id'> = {
         date: form.date,
@@ -200,6 +233,8 @@ function ScheduleContent() {
         result: hasResult ? (form.result as '승' | '무' | '패') : null,
         homeScore: hasResult ? Number(form.homeScore) : null,
         awayScore: hasResult ? Number(form.awayScore) : null,
+        // 승부차기가 없으면 항목 자체를 저장하지 않는다 (setDoc이 통째로 덮어써 예전 값도 지워진다)
+        ...(hasPk ? { homePk: Number(form.homePk), awayPk: Number(form.awayPk) } : {}),
         // setDoc은 문서를 통째로 덮어쓰므로 기존 대회 연결을 직접 넘겨줘야 한다
         ...(editId ? pickTournamentId(matches.find(m => m.id === editId)) : {}),
       };
@@ -310,7 +345,7 @@ function ScheduleContent() {
               {group.matches.map(m => <article key={m.id} className="sc-match">
                 <div className="sc-date"><strong>{m.date.slice(5).replace('-','.')}</strong><small>{m.day || getDayFromDate(m.date)}요일{m.time ? ` · ${m.time}` : ''}</small></div>
                 <div className="sc-teams"><span className={m.home === 'TAES FC' ? 'sc-team-home' : 'sc-team'}>{m.home}</span>
-                  <div className={`sc-score ${m.result ? '' : 'sc-versus'}`} aria-label={m.result ? `${m.homeScore ?? '미입력'} 대 ${m.awayScore ?? '미입력'}` : '대결 예정'}>{m.result ? <><span>{m.homeScore ?? '—'}</span><i>:</i><span>{m.awayScore ?? '—'}</span></> : 'VS'}</div>
+                  <div className={`sc-score ${m.result ? '' : 'sc-versus'}`} aria-label={m.result ? `${m.homeScore ?? '미입력'} 대 ${m.awayScore ?? '미입력'}${hasPk(m) ? `, 승부차기 ${m.homePk} 대 ${m.awayPk}` : ''}` : '대결 예정'}>{m.result ? <><span>{m.homeScore ?? '—'}</span><i>:</i><span>{m.awayScore ?? '—'}</span>{hasPk(m) && <small className="sc-pk">PK {m.homePk}:{m.awayPk}</small>}</> : 'VS'}</div>
                   <div className="sc-opponent"><span className={m.away === 'TAES FC' ? 'sc-team-home' : 'sc-team'}>{m.away}</span>{m.result && <span className={`sc-result ${m.result === '승' ? 'won' : m.result === '패' ? 'lost' : 'drawn'}`}>{m.result}</span>}</div>
                 </div>
                 <div className="sc-venue">{m.venue || '경기장 미정'}{!m.result && <span>예정</span>}</div>
@@ -416,6 +451,35 @@ function ScheduleContent() {
                         className="w-full px-3 py-2.5 bg-[#0e0e0e] border border-white/10 text-white focus:border-red-700 outline-none text-sm text-center" />
                     </div>
                   </div>
+
+                  {/* 승부차기 */}
+                  <label className="flex items-center gap-3 cursor-pointer pt-1">
+                    <input id="match-has-pk" type="checkbox" checked={form.hasPk}
+                      onChange={(e) => setForm((f) => ({ ...f, hasPk: e.target.checked }))}
+                      className="w-4 h-4" style={{ accentColor: '#CC0000' }} />
+                    <span className="text-white/70 text-sm font-semibold">승부차기(PK)까지 갔어요</span>
+                  </label>
+                  {form.hasPk && (
+                    <div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="match-home-pk" className="block text-white/50 text-xs mb-1.5 font-semibold">홈 PK</label>
+                          <input id="match-home-pk" type="number" min="0" inputMode="numeric" value={form.homePk}
+                            onChange={(e) => setForm((f) => withPkResult({ ...f, homePk: e.target.value }))}
+                            className="w-full px-3 py-2.5 bg-[#0e0e0e] border border-white/10 text-white focus:border-red-700 outline-none text-sm text-center" />
+                        </div>
+                        <div>
+                          <label htmlFor="match-away-pk" className="block text-white/50 text-xs mb-1.5 font-semibold">원정 PK</label>
+                          <input id="match-away-pk" type="number" min="0" inputMode="numeric" value={form.awayPk}
+                            onChange={(e) => setForm((f) => withPkResult({ ...f, awayPk: e.target.value }))}
+                            className="w-full px-3 py-2.5 bg-[#0e0e0e] border border-white/10 text-white focus:border-red-700 outline-none text-sm text-center" />
+                        </div>
+                      </div>
+                      <p className="text-white/35 text-[11px] mt-2 leading-relaxed">
+                        위 득점에는 승부차기 전 점수를 적어 주세요. PK 점수를 넣으면 결과(승·패)가 자동으로 맞춰지고, 필요하면 위에서 바꿀 수 있습니다.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -48,7 +48,7 @@ service cloud.firestore {
       allow read: if true;
       allow create, update: if
            fields(['date', 'day', 'time', 'home', 'away', 'venue', 'grade',
-                   'result', 'homeScore', 'awayScore'], ['tournamentId'])
+                   'result', 'homeScore', 'awayScore'], ['tournamentId', 'homePk', 'awayPk'])
         && d().date is string && d().date.size() <= 40
         && d().day is string && d().day.size() <= 10
         && d().time is string && d().time.size() <= 10
@@ -59,6 +59,9 @@ service cloud.firestore {
         && (d().result == null || d().result in ['승', '무', '패'])
         && (d().homeScore == null || d().homeScore is number)
         && (d().awayScore == null || d().awayScore is number)
+        // 승부차기 점수 (승부차기까지 간 경기에만 있음)
+        && (!('homePk' in d()) || (d().homePk is number && d().homePk >= 0 && d().homePk <= 99))
+        && (!('awayPk' in d()) || (d().awayPk is number && d().awayPk >= 0 && d().awayPk <= 99))
         && (!('tournamentId' in d()) ||
             (d().tournamentId is string && d().tournamentId.size() <= 60));
       allow delete: if true;

@@ -148,6 +148,8 @@ type MatchItem = {
   result: '승' | '무' | '패' | null;
   homeScore: number | null;
   awayScore: number | null;
+  homePk?: number;
+  awayPk?: number;
   time: string;
 };
 
@@ -617,7 +619,7 @@ export default function Home() {
                   {matches.slice(0, 5).map((s) => {
                     const hasResult = !!s.result;
                     const scoreText = hasResult && s.homeScore !== null && s.awayScore !== null
-                      ? `${s.homeScore} : ${s.awayScore}` : null;
+                      ? `${s.homeScore} : ${s.awayScore}${s.homePk != null && s.awayPk != null ? ` (PK ${s.homePk}:${s.awayPk})` : ''}` : null;
                     return (
                       <div
                         key={s.id}

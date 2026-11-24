@@ -35,6 +35,8 @@ type Match = {
   result: '승' | '무' | '패' | null;
   homeScore: number | null;
   awayScore: number | null;
+  homePk?: number;
+  awayPk?: number;
   tournamentId?: string;
 };
 
@@ -79,6 +81,10 @@ function goalsFor(m: Match) {
     gf: (isHome ? m.homeScore : m.awayScore) ?? 0,
     ga: (isHome ? m.awayScore : m.homeScore) ?? 0,
     opponent: isHome ? m.away : m.home,
+    // 승부차기 점수도 TAES 기준으로 (없으면 null)
+    pk: m.homePk != null && m.awayPk != null
+      ? (isHome ? `${m.homePk}:${m.awayPk}` : `${m.awayPk}:${m.homePk}`)
+      : null,
   };
 }
 
@@ -572,7 +578,7 @@ export default function MapPage() {
                                 <table className="w-full text-[13px]">
                                   <tbody>
                                     {games.map(m => {
-                                      const { gf, ga, opponent } = goalsFor(m);
+                                      const { gf, ga, opponent, pk } = goalsFor(m);
                                       return (
                                         <tr key={m.id} className="border-b border-white/5 last:border-0">
                                           <td className="py-2 text-white/40 whitespace-nowrap w-[46px]">
@@ -581,6 +587,7 @@ export default function MapPage() {
                                           <td className="py-2 text-white/85">{opponent}</td>
                                           <td className="py-2 text-right font-black text-base text-white whitespace-nowrap w-[48px]">
                                             {gf}:{ga}
+                                            {pk && <span className="block text-[10.5px] font-bold leading-tight" style={{ color: '#f0c35a' }}>PK {pk}</span>}
                                           </td>
                                           <td className="py-2 text-right w-[26px]">
                                             {m.result && (
@@ -757,7 +764,7 @@ export default function MapPage() {
               {candidates.length ? (
                 <ul className="border border-white/10 max-h-80 overflow-y-auto">
                   {candidates.map(m => {
-                    const { gf, ga, opponent } = goalsFor(m);
+                    const { gf, ga, opponent, pk } = goalsFor(m);
                     const other = m.tournamentId && m.tournamentId !== t.id;
                     return (
                       <li key={m.id} className="border-b border-white/5 last:border-0">
@@ -776,7 +783,7 @@ export default function MapPage() {
                               </span>
                             )}
                           </span>
-                          <span className="flex-none text-white font-black text-sm">{gf}:{ga}</span>
+                          <span className="flex-none text-white font-black text-sm">{gf}:{ga}{pk && <span className="ml-1 text-[10.5px] font-bold" style={{ color: '#f0c35a' }}>PK {pk}</span>}</span>
                           {m.result && (
                             <span className="flex-none inline-grid place-items-center text-[11px] font-bold text-white"
                               style={{ width: 20, height: 20, backgroundColor: resultColors[m.result] }}>
