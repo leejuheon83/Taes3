@@ -1,0 +1,52 @@
+.schedule-center{background:#090d12;color:#f3f4f6;min-height:100vh}
+.sc-shell{max-width:1280px;margin:auto;padding:38px 36px 90px}
+.sc-heading{display:flex;justify-content:space-between;align-items:end;margin-bottom:28px;gap:24px}
+.sc-eyebrow{color:#d55a64;font-size:10px;letter-spacing:2px;font-weight:700;margin-bottom:10px}
+.sc-heading h1{margin:0;font-size:31px;letter-spacing:-1.4px;line-height:1.3;font-weight:700}
+.sc-heading h1 span{color:#a3aab4;font-weight:400}
+.sc-heading p{margin:10px 0 0;color:#8c949f;font-size:12px}
+.sc-actions{display:flex;gap:9px;flex-shrink:0}
+.sc-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #414751;border-radius:5px;background:#131920;color:#dce0e6;padding:11px 15px;font-size:12px;font-weight:700;cursor:pointer;transition:border-color .2s}
+.sc-button:hover{border-color:#bd6972}.sc-button svg{width:16px;height:16px}
+.sc-button.sc-primary{background:#c91d2b;border-color:#e53a47;color:white}
+.sc-overview{display:grid;grid-template-columns:1.35fr repeat(4,1fr);border:1px solid #303742;background:linear-gradient(115deg,#19212b,#11171f);border-radius:9px;margin-bottom:30px;padding:22px 0}
+.sc-metric{padding:0 28px;border-left:1px solid #323945;display:flex;flex-direction:column;gap:8px}.sc-metric:first-child{border:0}
+.sc-metric>span{font-size:11px;color:#a3acb9}.sc-metric strong{font-size:30px;line-height:1.15;letter-spacing:-1px;font-variant-numeric:tabular-nums;font-weight:700}
+.sc-metric strong small{font-size:11px;color:#9ba3af;font-weight:400;letter-spacing:0;margin-left:4px}
+.sc-metric.win strong{color:#66c490}.sc-metric.loss strong{color:#ed7880}.sc-metric.draw strong{color:#a0a8b6}
+.sc-winrate{display:grid;grid-template-columns:55px auto;align-items:center;column-gap:16px;row-gap:8px}
+.sc-ring{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;grid-row:1/3}
+.sc-ring:after{content:"";width:44px;height:44px;background:#19212b;border-radius:50%}
+.sc-winrate>span{align-self:end}.sc-winrate strong{font-size:29px;align-self:start}
+.sc-toolbar{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #30353d;margin-bottom:22px;gap:16px}
+.sc-tabs{display:flex;gap:28px}.sc-tabs button{background:transparent;border:0;color:#87909c;font-size:14px;padding:0 0 16px;position:relative;cursor:pointer}
+.sc-tabs button.active{color:white;font-weight:700}.sc-tabs button.active:after{content:"";position:absolute;bottom:-1px;left:0;right:0;height:3px;background:#df2937}
+.sc-tabs small{font-size:10px;margin-left:6px;background:#29303a;color:#aab4c1;padding:3px 6px;border-radius:3px}
+.sc-filters{display:flex;align-items:center;gap:10px;padding-bottom:12px}
+.sc-filters select{background:#121820;border:1px solid #353d48;border-radius:4px;color:#d4dae3;padding:7px 10px;font-size:11px;cursor:pointer;color-scheme:dark}
+.sc-list-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.sc-list-heading h2{font-size:14px;margin:0;font-weight:600}.sc-list-heading>span{font-size:11px;color:#7e8998}
+.sc-group{border:1px solid #333b47;border-radius:8px;margin-bottom:22px;background:#11171e}
+.sc-group-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 22px;border-bottom:1px solid #303a46;background:linear-gradient(90deg,#202936,#141b24);border-radius:7px 7px 0 0}
+.sc-group-title{display:flex;align-items:center;gap:12px;min-width:0}
+.sc-cup{display:grid;place-items:center;color:#d4b569;width:34px;height:34px;border:1px solid #5a503a;background:#2d2b24;border-radius:5px;flex-shrink:0}.sc-cup svg{width:21px;height:21px}
+.sc-group-title h3{font-size:15px;letter-spacing:-.4px;font-weight:700;line-height:1.5}.sc-group-title p{font-size:11px;color:#9aa5b4;margin:6px 0 0;line-height:1.5}
+.sc-stage{font-size:11px;color:#df8d94;border:1px solid #6d3b44;padding:5px 11px;border-radius:4px;background:#3b222b;white-space:nowrap}
+.sc-match{display:grid;grid-template-columns:78px minmax(0,1fr) 150px 36px;align-items:center;gap:20px;padding:18px 22px;border-bottom:1px solid #272e37}.sc-match:last-child{border:0}
+.sc-date strong{font-size:15px;letter-spacing:.2px}.sc-date small{display:block;color:#7b8797;font-size:10px;margin-top:5px;line-height:1.5}
+.sc-teams{display:grid;grid-template-columns:100px 84px minmax(0,1fr);align-items:center;gap:14px;min-width:0}
+.sc-team-home{font-size:13px;font-weight:700;color:#e6eaf0;overflow-wrap:anywhere}.sc-team{font-size:13px;color:#dce2eb;overflow-wrap:anywhere}
+.sc-score{display:flex;justify-content:center;align-items:center;gap:10px;font-size:23px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.5px;white-space:nowrap}.sc-score i{font-style:normal;font-size:13px;color:#667280;font-weight:400}
+.sc-score.sc-versus{font-size:12px;color:#b7bec9;letter-spacing:.14em}
+.sc-opponent{min-width:0;line-height:1.6}.sc-result{display:inline-block;min-width:23px;padding:2px 5px;border-radius:3px;font-size:10px;font-weight:700;text-align:center;margin-left:8px;vertical-align:middle}
+.sc-result.lost{color:#f0959c;background:#462730}.sc-result.won{color:#8cd2a5;background:#1e3d31}.sc-result.drawn{color:#c3cad5;background:#303947}
+.sc-venue{text-align:right;font-size:10px;color:#929cab;line-height:1.8;overflow-wrap:anywhere}.sc-venue>span{display:block;color:#b1bac7}
+.sc-management{position:relative;justify-self:end}
+.sc-management summary{display:grid;place-items:center;list-style:none;background:none;border:1px solid #303a47;color:#8c98a8;border-radius:4px;width:30px;height:30px;letter-spacing:2px;cursor:pointer;user-select:none}
+.sc-management summary::-webkit-details-marker{display:none}.sc-management[open] summary,.sc-management summary:hover{border-color:#7f8d9f;color:white}
+.sc-management-menu{position:absolute;right:0;top:36px;z-index:20;width:145px;padding:5px;border:1px solid #465361;border-radius:6px;background:#18212c;box-shadow:0 8px 24px #0009}
+.sc-management-menu button{display:flex;align-items:center;gap:9px;width:100%;padding:10px 9px;border:0;border-radius:3px;background:transparent;color:#d3dbe7;font-size:12px;cursor:pointer;text-align:left}.sc-management-menu button svg{width:15px;height:15px}
+.sc-management-menu button:hover{background:#2b3849}.sc-management-menu button.sc-delete{color:#f08f98}
+.sc-empty{padding:50px 20px;text-align:center;color:#aab4c2;border:1px solid #303742;border-radius:8px;background:#11171e;font-size:13px}
+@media(max-width:1000px){.sc-metric{padding:0 18px}.sc-match{grid-template-columns:65px minmax(0,1fr) 110px 30px;gap:14px}.sc-teams{grid-template-columns:80px 70px minmax(0,1fr);gap:10px}.sc-score{font-size:21px}}
+@media(max-width:850px){.sc-shell{padding:28px 20px 90px}.sc-metric{padding:0 15px}.sc-match{grid-template-columns:60px minmax(0,1fr) 28px;gap:12px}.sc-venue{grid-column:2;grid-row:2;text-align:left;font-size:10px}.sc-management{grid-column:3;grid-row:1}.sc-heading{align-items:start;gap:20px}.sc-actions{flex-wrap:wrap;justify-content:end;max-width:190px}.sc-button{font-size:11px;padding:9px 11px}.sc-overview{grid-template-columns:1.2fr repeat(4,1fr)}}
+@media(max-width:570px){.sc-heading h1{font-size:25px}.sc-heading{display:block}.sc-actions{justify-content:start;margin-top:20px;max-width:none}.sc-overview{grid-template-columns:repeat(4,1fr);row-gap:22px;padding:20px 0}.sc-winrate{grid-column:1/-1;display:flex;justify-content:center;gap:12px}.sc-ring{width:43px;height:43px}.sc-ring:after{width:35px;height:35px}.sc-metric:nth-child(2){border:0}.sc-metric{gap:8px;text-align:center;padding-inline:10px}.sc-metric strong{font-size:24px}.sc-toolbar{align-items:start;flex-wrap:wrap;gap:0}.sc-tabs{gap:18px;order:2;width:100%}.sc-tabs button{font-size:13px}.sc-filters{padding-bottom:18px;width:100%;justify-content:end}.sc-match{padding:16px 12px;gap:8px;grid-template-columns:48px minmax(0,1fr) 24px}.sc-teams{grid-template-columns:60px 62px minmax(0,1fr);gap:7px}.sc-team-home,.sc-team{font-size:11px}.sc-score{font-size:19px;gap:6px}.sc-result{margin-left:5px;min-width:20px}.sc-group-heading{padding:15px}.sc-group-title h3{font-size:13px}.sc-cup{display:none}.sc-date strong{font-size:13px}.sc-date small{font-size:9px}.sc-list-heading>span{display:none}.sc-management summary{width:26px;height:30px}.sc-venue{font-size:9px}}

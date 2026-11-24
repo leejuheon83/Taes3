@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import ClubIcon from '@/components/ClubIcon';
+import './schedule.css';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { SkeletonRows } from '@/components/Skeleton';
 import { db } from '@/lib/firebase';
@@ -23,7 +26,7 @@ type Match = {
   tournamentId?: string;
 };
 
-type TournamentRef = { id: string; name: string; from: string; to: string };
+type TournamentRef = { id: string; name: string; from: string; to: string; stage?: string; venue?: string };
 
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -54,11 +57,19 @@ function getDayFromDate(dateStr: string) {
 }
 
 export default function SchedulePage() {
+  return <Suspense fallback={<SkeletonRows count={5} height={92} />}><ScheduleContent /></Suspense>;
+}
+
+function ScheduleContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { requireAdmin, modal: adminModal } = useAdminAuth();
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'results'>('upcoming');
+  const activeTab = searchParams.get('tab') === 'results' ? 'results' : 'upcoming';
+  const [season, setSeason] = useState('all');
+  const [resultFilter, setResultFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -96,8 +107,6 @@ export default function SchedulePage() {
     loadMatches();
     loadTournaments();
   }, []);
-
-  const tournamentName = (id?: string) => tournaments.find(t => t.id === id)?.name;
 
   /** 경기 하나의 대회 연결을 바꾼다. 경기 기록 자체는 건드리지 않는다. */
   async function setMatchTournament(matchId: string, tournamentId: string | null) {
@@ -226,216 +235,98 @@ export default function SchedulePage() {
     }
   };
 
-  const filtered = matches.filter((m) => {
+  const years = [...new Set(matches.map(m => m.date.slice(0,4)))].sort().reverse();
+  const seasonMatches = matches.filter(m => season === 'all' || m.date.startsWith(season));
+  const filtered = seasonMatches.filter((m) => {
     const matchTab = activeTab === 'upcoming' ? m.result === null : m.result !== null;
-    return matchTab;
+    return matchTab && (activeTab !== 'results' || resultFilter === 'all' || m.result === resultFilter);
   }).sort((a, b) => {
-    if (activeTab === 'upcoming') return a.date.localeCompare(b.date);
-    return b.date.localeCompare(a.date);
+    if (activeTab === 'upcoming') return a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '');
+    return b.date.localeCompare(a.date) || (b.time ?? '').localeCompare(a.time ?? '');
   });
 
-  const completed = matches.filter((m) => m.result !== null);
+  const completed = seasonMatches.filter((m) => m.result !== null);
   const wins = completed.filter((m) => m.result === '승').length;
   const draws = completed.filter((m) => m.result === '무').length;
   const losses = completed.filter((m) => m.result === '패').length;
   const totalGoalsFor = completed.reduce((sum, m) =>
     sum + (m.home === 'TAES FC' ? (m.homeScore ?? 0) : (m.awayScore ?? 0)), 0);
+  const total = completed.length;
+  const winRate = total ? Math.round(wins / total * 100) : 0;
+  const groups = new Map<string, { tournament?: TournamentRef; matches: Match[] }>();
+  filtered.forEach(m => {
+    const tournament = tournaments.find(t => t.id === m.tournamentId);
+    const key = tournament ? tournament.id : `date-${m.date}`;
+    if (!groups.has(key)) groups.set(key, { tournament, matches: [] });
+    groups.get(key)!.matches.push(m);
+  });
+  function manageMatch(e: React.MouseEvent<HTMLButtonElement>, action: () => void) {
+    e.currentTarget.closest('details')?.removeAttribute('open');
+    action();
+  }
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <div className="py-16 px-4" style={{ background: 'linear-gradient(135deg, #050505 0%, #1a0000 100%)' }}>
-        <div className="max-w-6xl mx-auto flex items-end justify-between">
-          <div>
-            <div className="section-eyebrow mb-2">SCHEDULE</div>
-            <h1 className="text-4xl section-title mb-2">경기 일정 · 결과</h1>
-            <p className="text-white/40 text-sm">2025 시즌 경기 일정 및 결과입니다.</p>
+    <div className="schedule-center min-h-screen">
+      <div className="sc-shell">
+        <header className="sc-heading">
+          <div><div className="sc-eyebrow">MATCH CENTER</div><h1>경기 일정 <span>·</span> 결과</h1><p>함께 뛴 경기, 차곡차곡 쌓이는 우리 팀의 기록.</p></div>
+          <div className="sc-actions">
+            <button className="sc-button" onClick={exportICS} title="예정 경기를 캘린더 앱으로 내보내기"><ClubIcon name="calendar" />캘린더 내보내기</button>
+            <button className="sc-button sc-primary" onClick={() => requireAdmin(openAdd)}><ClubIcon name="plus" />경기 등록</button>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={exportICS}
-              className="flex items-center gap-2 px-4 py-2.5 font-bold text-sm border border-white/20 hover:border-white/40 transition-colors"
-              style={{ color: 'rgba(255,255,255,0.6)' }}
-              title="예정 경기를 캘린더 앱으로 내보내기"
-            >
-              📅 캘린더 내보내기
-            </button>
-            <button
-              onClick={() => requireAdmin(openAdd)}
-              className="flex items-center gap-2 px-5 py-2.5 font-bold text-white text-sm transition-opacity hover:opacity-80"
-              style={{ backgroundColor: '#CC0000' }}
-            >
-              + 경기 등록
-            </button>
+        </header>
+        <section className="sc-overview" aria-label="선택한 시즌 통계" aria-busy={loading}>
+          <div className="sc-metric sc-winrate">
+            <div className="sc-ring" aria-hidden="true" style={{ background: total ? `conic-gradient(#58b981 0 ${wins / total * 100}%, #48515f ${wins / total * 100}% ${(wins + draws) / total * 100}%, #b94a54 ${(wins + draws) / total * 100}% 100%)` : '#303945' }} />
+            <span>{season === 'all' ? '전체 승률' : `${season} 승률`}</span><strong>{loading ? '—' : winRate}<small>%</small></strong>
+          </div>
+          {[
+            { label:'승리', value:wins, unit:'승', tone:'win' },
+            { label:'무승부', value:draws, unit:'무', tone:'draw' },
+            { label:'패배', value:losses, unit:'패', tone:'loss' },
+            { label:'총 득점', value:totalGoalsFor, unit:'골', tone:'' },
+          ].map(s => <div key={s.label} className={`sc-metric ${s.tone}`}><span>{s.label}</span><strong>{loading ? '—' : s.value}<small>{s.unit}</small></strong></div>)}
+        </section>
+        <div className="sc-toolbar">
+          <div className="sc-tabs" role="tablist" aria-label="경기 종류">
+            {(['upcoming','results'] as const).map(tab => <button key={tab} id={`sc-tab-${tab}`} role="tab" aria-selected={activeTab === tab} aria-controls="sc-match-panel" tabIndex={activeTab === tab ? 0 : -1}
+              onKeyDown={e => { if (['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) { e.preventDefault(); const next = e.key === 'Home' ? 'upcoming' : e.key === 'End' ? 'results' : tab === 'upcoming' ? 'results' : 'upcoming'; document.getElementById(`sc-tab-${next}`)?.focus(); const params = new URLSearchParams(searchParams.toString()); params.set('tab',next); router.replace(`?${params}`,{scroll:false}); } }}
+              onClick={() => { const params = new URLSearchParams(searchParams.toString()); params.set('tab',tab); router.replace(`?${params}`,{scroll:false}); }}
+              className={activeTab === tab ? 'active' : ''}>{tab === 'upcoming' ? '예정 경기' : '경기 결과'}<small>{seasonMatches.filter(m => tab === 'upcoming' ? m.result === null : m.result !== null).length}</small></button>)}
+          </div>
+          <div className="sc-filters">
+            <select aria-label="시즌 선택" value={season} onChange={e => setSeason(e.target.value)}><option value="all">전체 시즌</option>{years.map(y => <option key={y} value={y}>{y} 시즌</option>)}</select>
+            {activeTab === 'results' && <select aria-label="경기 결과 필터" value={resultFilter} onChange={e => setResultFilter(e.target.value)}><option value="all">전체 결과</option><option value="승">승리</option><option value="무">무승부</option><option value="패">패배</option></select>}
           </div>
         </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto px-4 py-10">
-        {/* Season record — 도넛 차트 */}
-        {(() => {
-          const total = wins + draws + losses;
-          const r = 54, cx = 64, cy = 64, stroke = 14;
-          const circ = 2 * Math.PI * r;
-          const wLen = circ * (total ? wins / total : 0);
-          const dLen = circ * (total ? draws / total : 0);
-          const lLen = circ * (total ? losses / total : 0);
-          const dOff = -(circ - wLen);
-          const lOff = -(circ - wLen - dLen);
-          const winRate = total ? Math.round((wins / total) * 100) : 0;
-          return (
-            <div className="flex flex-col sm:flex-row items-center gap-8 p-6 mb-10 border border-white/10" style={{ backgroundColor: '#080808' }}>
-              {/* 도넛 */}
-              <div className="relative flex-shrink-0">
-                <svg width={128} height={128} viewBox="0 0 128 128">
-                  <circle cx={cx} cy={cy} r={r} fill="none" stroke="#222" strokeWidth={stroke} />
-                  {total === 0 ? (
-                    <circle cx={cx} cy={cy} r={r} fill="none" stroke="#333" strokeWidth={stroke} />
-                  ) : (
-                    <>
-                      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#16a34a" strokeWidth={stroke}
-                        strokeDasharray={`${wLen} ${circ - wLen}`} strokeDashoffset={circ / 4} strokeLinecap="butt" />
-                      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#6b7280" strokeWidth={stroke}
-                        strokeDasharray={`${dLen} ${circ - dLen}`} strokeDashoffset={circ / 4 + dOff} strokeLinecap="butt" />
-                      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#dc2626" strokeWidth={stroke}
-                        strokeDasharray={`${lLen} ${circ - lLen}`} strokeDashoffset={circ / 4 + lOff} strokeLinecap="butt" />
-                    </>
-                  )}
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="text-2xl font-black text-white">{winRate}%</div>
-                  <div className="text-[10px] text-white/40 font-bold">승률</div>
+        <section id="sc-match-panel" role="tabpanel" aria-labelledby={`sc-tab-${activeTab}`} tabIndex={0}>
+          <div className="sc-list-heading"><h2>{activeTab === 'results' ? '최근 경기 결과' : '다가오는 경기'}</h2><span>{activeTab === 'results' ? '최신순' : '날짜순'} · 대회별 보기</span></div>
+          {loading ? <SkeletonRows count={5} height={92} /> : !filtered.length ? <div className="sc-empty">{activeTab === 'upcoming' ? '예정된 경기가 없습니다.' : '조건에 맞는 경기 결과가 없습니다.'}</div> : [...groups.entries()].map(([key,group]) => {
+            const {tournament} = group;
+            const dates = [...new Set(group.matches.map(m => m.date))].sort();
+            const range = dates.length > 1 ? `${dates[0].replace(/-/g,'.')} – ${dates[dates.length-1].slice(5).replace('-','.')}` : dates[0].replace(/-/g,'.');
+            return <section key={key} className="sc-group" aria-label={tournament?.name ?? '연습·친선 경기'}>
+              <header className="sc-group-heading"><div className="sc-group-title"><span className="sc-cup"><ClubIcon name={tournament ? 'cup' : 'ball'} /></span><div><h3>{tournament?.name ?? '연습·친선 경기'}</h3><p>{range}{tournament?.venue ? ` · ${tournament.venue}` : ''}</p></div></div>{activeTab === 'results' && tournament?.stage && <span className="sc-stage">{tournament.stage}</span>}</header>
+              {group.matches.map(m => <article key={m.id} className="sc-match">
+                <div className="sc-date"><strong>{m.date.slice(5).replace('-','.')}</strong><small>{m.day || getDayFromDate(m.date)}요일{m.time ? ` · ${m.time}` : ''}</small></div>
+                <div className="sc-teams"><span className={m.home === 'TAES FC' ? 'sc-team-home' : 'sc-team'}>{m.home}</span>
+                  <div className={`sc-score ${m.result ? '' : 'sc-versus'}`} aria-label={m.result ? `${m.homeScore ?? '미입력'} 대 ${m.awayScore ?? '미입력'}` : '대결 예정'}>{m.result ? <><span>{m.homeScore ?? '—'}</span><i>:</i><span>{m.awayScore ?? '—'}</span></> : 'VS'}</div>
+                  <div className="sc-opponent"><span className={m.away === 'TAES FC' ? 'sc-team-home' : 'sc-team'}>{m.away}</span>{m.result && <span className={`sc-result ${m.result === '승' ? 'won' : m.result === '패' ? 'lost' : 'drawn'}`}>{m.result}</span>}</div>
                 </div>
-              </div>
-              {/* 수치 */}
-              <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
-                {[
-                  { label: '승', value: wins, color: '#16a34a' },
-                  { label: '무', value: draws, color: '#6b7280' },
-                  { label: '패', value: losses, color: '#dc2626' },
-                  { label: '득점', value: totalGoalsFor, color: '#CC0000' },
-                ].map(s => (
-                  <div key={s.label} className="text-center py-4 border border-white/5 rounded" style={{ backgroundColor: '#0d0d0d' }}>
-                    <div className="text-3xl font-black mb-0.5" style={{ color: s.color }}>{s.value}</div>
-                    <div className="text-white/40 text-xs font-bold">{s.label}</div>
+                <div className="sc-venue">{m.venue || '경기장 미정'}{!m.result && <span>예정</span>}</div>
+                <details className="sc-management" name="match-management" onKeyDown={e => { if (e.key === 'Escape') { e.currentTarget.open = false; e.currentTarget.querySelector('summary')?.focus(); } }}>
+                  <summary aria-label={`${m.date} ${m.home} 대 ${m.away} 경기 관리`}>···</summary>
+                  <div className="sc-management-menu">
+                    <button onClick={e => manageMatch(e, () => requireAdmin(() => setLinkMatch(m)))}><ClubIcon name="cup" />대회 연결</button>
+                    <button onClick={e => manageMatch(e, () => requireAdmin(() => openEdit(m), {reconfirm:true}))}><ClubIcon name="edit" />수정</button>
+                    <button className="sc-delete" onClick={e => manageMatch(e, () => requireAdmin(() => setDeleteId(m.id), {reconfirm:true}))}><ClubIcon name="trash" />삭제</button>
                   </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Tabs */}
-        <div className="flex gap-0 mb-6 border-b border-white/10">
-          {(['upcoming', 'results'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className="px-8 py-3 font-bold text-sm transition-colors border-b-2"
-              style={{
-                color: activeTab === tab ? '#CC0000' : 'rgba(255,255,255,0.4)',
-                borderBottomColor: activeTab === tab ? '#CC0000' : 'transparent',
-              }}
-            >
-              {tab === 'upcoming' ? '예정 경기' : '경기 결과'}
-            </button>
-          ))}
-        </div>
-
-        {/* Match list */}
-        <div className="space-y-3">
-          {loading ? (
-            <SkeletonRows count={5} height={92} />
-          ) : filtered.length === 0 ? (
-            <div className="py-20 text-center text-white/30 border border-white/10" style={{ backgroundColor: '#080808' }}>
-              경기가 없습니다.
-            </div>
-          ) : (
-            filtered.map((m) => (
-              <div
-                key={m.id}
-                className="border transition-all"
-                style={{ backgroundColor: '#080808', borderColor: m.result ? 'rgba(255,255,255,0.05)' : 'rgba(204,0,0,0.2)' }}
-              >
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5">
-                  {/* Date */}
-                  <div className="flex-shrink-0 text-center sm:w-20">
-                    <div className="text-white font-black text-lg">{m.date.slice(5).replace('-', '.')}</div>
-                    <div className="text-white/40 text-xs">{m.day}요일 {m.time}</div>
-                  </div>
-
-                  {/* Match */}
-                  <div className="flex-1 flex items-center gap-3 flex-wrap">
-                    <span className={`font-black text-base sm:text-lg ${m.home === 'TAES FC' ? 'text-white' : 'text-white/50'}`}>
-                      {m.home}
-                    </span>
-                    {m.result !== null ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl font-black text-white px-4 py-1" style={{ backgroundColor: '#0e0e0e' }}>
-                          {m.homeScore} : {m.awayScore}
-                        </span>
-                        <span className="text-white text-xs font-black px-2 py-1" style={{ backgroundColor: resultColors[m.result] }}>
-                          {m.result}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs font-bold px-4 py-1"
-                        style={{ color: '#CC0000', backgroundColor: 'rgba(204,0,0,0.1)', border: '1px solid rgba(204,0,0,0.3)' }}>
-                        VS
-                      </span>
-                    )}
-                    <span className={`font-black text-base sm:text-lg ${m.away === 'TAES FC' ? 'text-white' : 'text-white/50'}`}>
-                      {m.away}
-                    </span>
-                  </div>
-
-                  {/* Venue + actions */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <div className="text-right text-xs text-white/30">
-                      <div>📍 {m.venue}</div>
-                      {tournamentName(m.tournamentId) && (
-                        <div className="mt-1" style={{ color: '#ff8b84' }}>🏆 {tournamentName(m.tournamentId)}</div>
-                      )}
-                      {!m.result && (
-                        <div className="mt-1">
-                          <span className="text-white text-[10px] font-bold px-2 py-0.5" style={{ backgroundColor: '#CC0000' }}>예정</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <button
-                        onClick={() => requireAdmin(() => setLinkMatch(m))}
-                        className="text-[10px] font-bold px-2 py-1 border transition-colors hover:brightness-125"
-                        style={{
-                          color: m.tournamentId ? '#ff8b84' : 'rgba(255,255,255,0.6)',
-                          borderColor: m.tournamentId ? 'rgba(204,0,0,0.5)' : 'rgba(255,255,255,0.1)',
-                        }}
-                        title={tournamentName(m.tournamentId) ?? '대회에 연결하기'}
-                      >
-                        🏆 대회
-                      </button>
-                      <button
-                        onClick={() => requireAdmin(() => openEdit(m), { reconfirm: true })}
-                        className="text-[10px] font-bold px-2 py-1 text-white/60 hover:text-white border border-white/10 hover:border-white/30 transition-colors"
-                      >
-                        수정
-                      </button>
-                      <button
-                        onClick={() => requireAdmin(() => setDeleteId(m.id), { reconfirm: true })}
-                        className="text-[10px] font-bold px-2 py-1 hover:text-white border border-red-900/30 hover:border-red-600 transition-colors"
-                        style={{ color: '#dc2626' }}
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+                </details>
+              </article>)}
+            </section>;
+          })}
+        </section>
       </div>
-
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>

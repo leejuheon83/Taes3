@@ -73,13 +73,14 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      aria-label="주 메뉴"
+      className={`club-nav fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled ? 'bg-black/95 shadow-lg shadow-black/50' : 'bg-black/70 backdrop-blur-sm'
       }`}
     >
       {/* Top bar */}
-      <div className="py-1.5 px-4" style={{
-        background: 'linear-gradient(90deg, #7a0000 0%, #cc0000 22%, #e11400 50%, #cc0000 78%, #7a0000 100%)',
+      <div className="club-topbar py-1.5 px-4" style={{
+        background: '#ad1722',
         borderBottom: '1px solid rgba(0,0,0,0.55)',
       }}>
         <div className="max-w-7xl mx-auto flex justify-center items-center gap-2 sm:gap-3 text-[11px] sm:text-xs">
@@ -135,6 +136,7 @@ export default function Navbar() {
               >
                 <Link
                   href={item.href}
+                  aria-current={pathname === item.href ? 'page' : undefined}
                   className={`nav-link px-4 py-2 text-sm font-semibold transition-colors relative ${
                     pathname === item.href || pathname.startsWith(item.href + '/')
                       ? 'text-[#CC0000]'
@@ -201,6 +203,8 @@ export default function Navbar() {
             className="lg:hidden text-white p-2 flex flex-col justify-center items-center w-10 h-10 gap-0"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="메뉴"
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-navigation"
           >
             <div className={`w-6 h-0.5 bg-white transition-all duration-300 origin-center ${mobileOpen ? 'rotate-45 translate-y-[4px]' : '-translate-y-1'}`} />
             <div className={`w-6 h-0.5 bg-white transition-all duration-300 ${mobileOpen ? 'opacity-0 scale-x-0' : 'opacity-100'}`} />
@@ -210,7 +214,7 @@ export default function Navbar() {
       </div>
 
       {/* Mobile Menu */}
-      <div className={`lg:hidden border-t border-white/10 overflow-hidden transition-all duration-300 ease-in-out ${mobileOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}
+      <div id="mobile-navigation" inert={!mobileOpen} className={`lg:hidden border-t border-white/10 overflow-hidden transition-all duration-300 ease-in-out ${mobileOpen ? 'max-h-[calc(100dvh-88px)] overflow-y-auto opacity-100' : 'max-h-0 opacity-0'}`}
         style={{ backgroundColor: '#0d0d0d' }}>
         {navItems.map((item) => (
           <div key={item.href}>
