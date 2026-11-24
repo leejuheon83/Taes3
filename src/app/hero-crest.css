@@ -1,0 +1,39 @@
+.hero-crest {
+  position: relative;
+  padding: 24px;
+  isolation: isolate;
+}
+.hero-crest::before {
+  content: '';
+  position: absolute;
+  inset: 10%;
+  z-index: -1;
+  pointer-events: none;
+  border: 0;
+  border-radius: 0;
+  background: radial-gradient(ellipse, rgba(230, 29, 48, .25), rgba(190, 16, 34, .08) 42%, transparent 72%);
+  filter: blur(20px);
+  animation: crest-breathe 5s ease-in-out infinite;
+}
+.hero-crest img {
+  filter: drop-shadow(0 16px 28px rgba(0, 0, 0, .65)) drop-shadow(0 0 13px rgba(238, 35, 54, .28)) !important;
+  animation: crest-float 5s ease-in-out infinite;
+  transition: filter .35s ease;
+}
+@media (hover: hover) {
+  .hero-crest:hover img {
+    filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .65)) drop-shadow(0 0 22px rgba(255, 44, 63, .48)) !important;
+  }
+}
+@keyframes crest-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes crest-breathe {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-crest img, .hero-crest::before { animation: none; }
+  .hero-crest img { transition: none; }
+}

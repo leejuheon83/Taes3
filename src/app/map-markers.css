@@ -1,0 +1,12 @@
+.satellite-map-icon { position:relative;display:flex;align-items:flex-start;justify-content:center;width:36px;height:44px;min-height:0;padding:8px 0 0;border:0;background:transparent;color:var(--pin-color);cursor:pointer;filter:drop-shadow(0 3px 4px #000b); }
+.satellite-map-icon::before { content:'';position:absolute;left:3px;top:2px;width:30px;height:30px;border:1px solid var(--pin-color);border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:linear-gradient(135deg,#263441,#0a1520);box-shadow:inset 0 1px 1px #ffffff25;transition:box-shadow .2s,border-color .2s; }
+.satellite-map-icon svg { position:relative;z-index:1;width:20px;height:20px; }
+.satellite-map-icon.is-champion { color:#ffdb79; }
+.satellite-map-icon.is-champion::before { background:linear-gradient(135deg,#846525,#332a16);border-color:#e9be55; }
+.satellite-map-icon.is-active::before { border-width:2px;box-shadow:0 0 0 3px #ffffff1a,0 3px 8px #0008; }
+.satellite-map-icon:hover::before { border-color:white;box-shadow:0 0 0 3px #ffffff26; }
+.legend-achievement { display:inline-flex; }
+.legend-achievement svg { width:15px;height:15px; }
+.satellite-canvas .satellite-tip { padding:7px 10px;border:1px solid #425163;border-radius:4px;background:#101b27;color:#e8edf4;box-shadow:0 3px 12px #0006;font:11px var(--font-body),sans-serif; }
+.satellite-canvas .satellite-tip::before { border-top-color:#425163; }
+.satellite-canvas .selected-city { font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000,0 0 5px #000; }

@@ -307,9 +307,9 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen club-home">
       {/* ─── HERO ─── */}
-      <section className="relative flex items-center overflow-hidden" style={{ minHeight: 620 }}>
+      <section className="club-hero relative flex items-center overflow-hidden">
         {/* 배경 (축구하는 아이들) */}
         <Image
           src="/taes-hero-bg.jpg"
@@ -322,7 +322,7 @@ export default function Home() {
         />
         {/* 가독성 오버레이 (은은하게) */}
         <div className="absolute inset-0 pointer-events-none" style={{
-          background: 'linear-gradient(90deg, rgba(4,4,4,0.50) 0%, rgba(4,4,4,0.26) 42%, rgba(4,4,4,0.08) 72%, rgba(4,4,4,0.26) 100%)',
+          background: 'linear-gradient(90deg, rgba(7,9,12,0.94) 0%, rgba(7,9,12,0.72) 45%, rgba(7,9,12,0.3) 100%)',
         }} />
         <div className="absolute inset-x-0 bottom-0 h-28 pointer-events-none" style={{
           background: 'linear-gradient(to top, #050505 0%, transparent 100%)',
@@ -342,6 +342,7 @@ export default function Home() {
                 </span>
               </div>
 
+              <div className="hero-kicker">THE NEXT GENERATION OF FOOTBALL</div>
               <div className="title-wrap">
                 <Image
                   src="/taes-title.png"
@@ -361,11 +362,15 @@ export default function Home() {
                 끝까지 해내는 아이로 자라는 과정,<br />
                 그것이 바로 태즈가 말하는 성장입니다.
               </p>
+              <div className="hero-actions">
+                <Link href="/players" className="club-button club-button-primary">선수단 만나보기 <span aria-hidden>↗</span></Link>
+                <Link href="/schedule" className="club-button club-button-secondary">경기 일정 <span aria-hidden>→</span></Link>
+              </div>
               </div>
             </div>
 
             {/* 우: 엠블럼 (외곽을 도는 불빛) */}
-            <div className="flex-shrink-0" style={{ width: 'min(58vw, 370px)' }}>
+            <div className="hero-crest flex-shrink-0" style={{ width: 'min(58vw, 370px)' }}>
               <Image
                 src="/taes-emblem.png"
                 alt="TAES FC 엠블럼"
@@ -381,6 +386,10 @@ export default function Home() {
           </div>
         </div>
       </section>
+      <div className="club-manifesto" aria-label="팀 슬로건">
+        <span>ONE TEAM. ONE DREAM.</span><span className="manifesto-line" />
+        <span>함께 뛰고, 함께 자랍니다.</span><span className="manifesto-season">TAES FC · PREMIER</span>
+      </div>
 
       {/* ─── 다음 경기 D-day ─── */}
       {nextMatch && (() => {
@@ -411,7 +420,7 @@ export default function Home() {
       })()}
 
       {/* ─── 태즈의 순간들 ─── */}
-      <section style={{ backgroundColor: '#080808', borderTop: '2px solid #CC0000' }}>
+      <section className="club-moments" style={{ backgroundColor: '#080808', borderTop: '1px solid rgba(255,255,255,.1)' }}>
         <div className="max-w-7xl mx-auto px-4 py-14">
 
           {/* 섹션 헤더 */}
@@ -550,7 +559,7 @@ export default function Home() {
       )}
 
       {/* ─── MAIN CONTENT ─── */}
-      <div className="max-w-7xl mx-auto px-4 py-16">
+      <div className="club-dashboard max-w-7xl mx-auto px-4 py-16">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* Left: Notices + Schedule */}

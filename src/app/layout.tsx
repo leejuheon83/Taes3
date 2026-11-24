@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_KR, Black_Han_Sans, Saira_Condensed } from "next/font/google";
+import "leaflet/dist/leaflet.css";
 import "./globals.css";
+import "./map-markers.css";
+import "./hero-crest.css";
 
 // 본문용 한글 서체
 const notoSansKR = Noto_Sans_KR({

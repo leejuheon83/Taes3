@@ -3,14 +3,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAdminAuth } from '@/components/AdminAuth';
 import { SkeletonRows } from '@/components/Skeleton';
+import ClubIcon, { type ClubIconName } from '@/components/ClubIcon';
+import TournamentSatelliteMap from '@/components/TournamentSatelliteMap';
+import './map-dashboard.css';
 import { db } from '@/lib/firebase';
 import {
   collection, getDocs, doc, setDoc, deleteDoc, orderBy, query, writeBatch, deleteField
 } from 'firebase/firestore';
-import {
-  MAINLAND, JEJU, HOME,
-  project, fitView, toPercent, ringToPath, distanceKm,
-} from '@/lib/korea';
+import { HOME, distanceKm } from '@/lib/korea';
 
 const STAGES = ['우승', '준우승', '4강', '8강', '16강', '조별'] as const;
 type Stage = (typeof STAGES)[number];
@@ -67,6 +67,7 @@ function formatRange(from: string, to: string) {
   const b = to.split('-');
   if (a.length < 3) return from;
   const start = `${a[0]}.${a[1]}.${a[2]}`;
+  if (from === to) return start;
   if (b.length < 3) return start;
   return `${start}–${a[1] === b[1] ? b[2] : `${b[1]}.${b[2]}`}`;
 }
@@ -108,7 +109,8 @@ export default function MapPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // 선택과 별개로, 목록에서 세부 경기표를 펼쳐 둘지 여부
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [showRoute, setShowRoute] = useState(true);
+  const [showRoute, setShowRoute] = useState(false);
+  const [sortOrder, setSortOrder] = useState('latest');
 
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -139,7 +141,7 @@ export default function MapPage() {
         if (loaded.length) {
           const latest = loaded[loaded.length - 1].id;
           setSelectedId(latest);
-          setExpandedId(latest);
+          setExpandedId(null);
         }
       } catch (err) {
         console.error('Failed to load tournaments:', err);
@@ -192,28 +194,6 @@ export default function MapPage() {
   const selected = visible.find(t => t.id === selectedId) ?? null;
   const selectedMatches = selected ? (matchesByTournament.get(selected.id) ?? []) : [];
   const selectedRecord = recordOf(selectedMatches);
-
-  const maxGames = Math.max(
-    1,
-    ...visible.map(t => (matchesByTournament.get(t.id) ?? []).length),
-  );
-
-  // 대회가 몰려 있는 지역으로 지도를 확대한다 (홈 포함). 연도 필터가 바뀌면 다시 맞춘다.
-  const view = useMemo(
-    () => fitView([HOME, ...visible].map(p => project(p.lat, p.lng))),
-    [visible],
-  );
-  const pct = (lat: number, lng: number) => toPercent(view, project(lat, lng));
-
-  const routePath = useMemo(() => {
-    if (!showRoute || visible.length < 2) return '';
-    return visible
-      .map((t, i) => {
-        const [x, y] = project(t.lat, t.lng);
-        return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
-      })
-      .join('');
-  }, [visible, showRoute]);
 
   // ── 관리자 ──
   const openAdd = () => {
@@ -390,24 +370,22 @@ export default function MapPage() {
   const inputStyle = { backgroundColor: '#1a1a1a' };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#080808' }}>
+    <div className="satellite-page min-h-screen">
       {adminModal}
 
-      <div className="max-w-6xl mx-auto px-4 py-10">
-        <div className="flex items-end justify-between gap-4 flex-wrap mb-8">
+      <div className="satellite-shell mx-auto px-4 py-10">
+        <div className="satellite-heading flex items-end justify-between gap-4 flex-wrap mb-8">
           <div>
-            <h1 className="text-white font-black text-3xl sm:text-4xl">대회 지도</h1>
-            <div className="section-divider" />
-            <p className="text-white/40 text-sm mt-3">
-              지금까지 참가한 대회와 전적을 지도에 기록합니다.
-            </p>
+            <div className="map-page-eyebrow">TOURNAMENT ARCHIVE</div>
+            <h1>대회 지도</h1>
+            <p className="map-page-intro">함께 뛴 도시와 쌓아온 기록.</p>
           </div>
           <button
             onClick={() => requireAdmin(openAdd)}
             className="px-4 py-2.5 text-sm font-bold text-white hover:opacity-80 transition-opacity touch-manipulation"
             style={{ backgroundColor: '#CC0000' }}
           >
-            + 대회 등록
+            <ClubIcon name="plus" /> 대회 등록
           </button>
         </div>
 
@@ -431,8 +409,7 @@ export default function MapPage() {
         ) : (
           <>
             {/* 집계 */}
-            <div className="grid gap-px border border-white/10 mb-5"
-              style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(118px, 1fr))', backgroundColor: 'rgba(255,255,255,0.1)' }}>
+            <div className="satellite-stats">
               {[
                 ['참가 대회', `${stats.count}`, '개'],
                 ['방문 도시', `${stats.cities}`, '곳'],
@@ -440,15 +417,19 @@ export default function MapPage() {
                 ['우승', `${stats.titles}`, '회'],
                 ['원정 거리', stats.km.toLocaleString('ko-KR'), 'km'],
               ].map(([label, value, unit]) => (
-                <div key={label} className="px-4 py-3.5" style={{ backgroundColor: '#0f1012' }}>
+                <div key={label} className="stat-tile">
+                  <ClubIcon name={({ '참가 대회':'cup', '방문 도시':'pin', '치른 경기':'ball', '우승':'crown', '원정 거리':'road' } as Record<string, ClubIconName>)[label]} />
+                  <div>
                   <div className="text-white/40 text-[11px] mb-1">{label}</div>
                   <div className="text-white font-black text-2xl leading-none">
                     {value}
                     <span className="text-white/40 text-sm font-medium ml-0.5">{unit}</span>
                   </div>
+                  </div>
                 </div>
               ))}
-              <div className="px-4 py-3.5" style={{ backgroundColor: '#0f1012' }}>
+              <div className="stat-tile">
+                <ClubIcon name="chart" /><div>
                 <div className="text-white/40 text-[11px] mb-1">종합 전적</div>
                 <div className="font-black text-2xl leading-none">
                   <span style={{ color: resultColors['승'] }}>{stats.w}</span>
@@ -457,14 +438,16 @@ export default function MapPage() {
                   <span className="text-white/20 mx-0.5">·</span>
                   <span style={{ color: resultColors['패'] }}>{stats.l}</span>
                 </div>
+                </div>
               </div>
             </div>
 
             {/* 필터 */}
-            <div className="flex flex-wrap gap-2 items-center mb-4">
+            <div className="satellite-filters flex flex-wrap gap-2 items-center mb-4">
               {['all', ...years].map(y => (
                 <button
                   key={y}
+                  aria-pressed={activeYear === y}
                   onClick={() => setActiveYear(y)}
                   className="px-4 py-1.5 text-[13px] rounded-full border transition-colors touch-manipulation"
                   style={
@@ -478,6 +461,7 @@ export default function MapPage() {
               ))}
               <button
                 onClick={() => setShowRoute(v => !v)}
+                aria-pressed={showRoute}
                 className="px-4 py-1.5 text-[13px] rounded-full border transition-colors ml-auto touch-manipulation"
                 style={
                   showRoute
@@ -485,183 +469,45 @@ export default function MapPage() {
                     : { borderColor: 'rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.55)' }
                 }
               >
-                원정 경로
+                <ClubIcon name="route" /> 원정 경로 보기
               </button>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[420px_minmax(0,1fr)] items-start">
+            <div className="map-reference-layout grid gap-4 lg:grid-cols-[420px_minmax(0,1fr)] items-start">
               {/* 지도 */}
-              <section className="border border-white/10" style={{ backgroundColor: '#0f1012' }}>
-                <div
-                  className="relative mx-auto w-full"
-                  style={{ maxWidth: 400, aspectRatio: `${view.w} / ${view.h}`, backgroundColor: '#080a0d' }}
-                >
-                  <svg
-                    viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
-                    preserveAspectRatio="xMidYMid meet"
-                    className="absolute inset-0 w-full h-full"
-                    aria-hidden="true"
-                  >
-                    {[MAINLAND, JEJU].map((ring, i) => (
-                      <path key={i} d={ringToPath(ring)} fill="#1b1e23" stroke="rgba(204,0,0,.45)" strokeWidth="1.1"
-                        vectorEffect="non-scaling-stroke" />
-                    ))}
-                    {routePath && (
-                      <path d={routePath} fill="none" stroke="rgba(204,0,0,.5)" strokeWidth="1.6"
-                        strokeDasharray="5 5" strokeLinejoin="round" strokeLinecap="round"
-                        vectorEffect="non-scaling-stroke" />
-                    )}
-                  </svg>
-
-                  <div className="absolute inset-0">
-                    {/* 홈 */}
-                    <div className="absolute -translate-x-1/2 -translate-y-1/2 grid place-items-center"
-                      style={{ ...pct(HOME.lat, HOME.lng), zIndex: 1 }}>
-                      <span className="rounded-full bg-white"
-                        style={{ width: 11, height: 11, border: '2px solid #050505', boxShadow: '0 0 0 1px rgba(255,255,255,.14)' }} />
-                      <span className="absolute rounded-full border border-dashed border-white/35" style={{ width: 28, height: 28 }} />
-                      {/* 홈 글자는 점 왼쪽에 둔다 — 확대 보기에서 위쪽 대회 번호와 겹치지 않게 */}
-                      <span className="absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] font-bold text-white"
-                        style={{ right: 'calc(100% + 9px)', textShadow: '0 1px 3px #050505, 0 0 6px #050505' }}>
-                        홈 · {HOME.city}
-                      </span>
-                    </div>
-
-                    {visible.map((t, i) => {
-                      const games = (matchesByTournament.get(t.id) ?? []).length;
-                      const size = 15 + Math.round((games / maxGames) * 13);
-                      const isSel = t.id === selectedId;
-                      return (
-                        <button
-                          key={t.id}
-                          onClick={() => { setSelectedId(t.id); setExpandedId(t.id); }}
-                          aria-pressed={isSel}
-                          aria-label={`${t.name}, ${t.city}, ${t.stage}`}
-                          className="absolute -translate-x-1/2 -translate-y-1/2 grid place-items-center"
-                          style={{ ...pct(t.lat, t.lng), width: size, height: size, zIndex: 2 }}
-                        >
-                          <span
-                            className="rounded-full transition-transform"
-                            style={{
-                              width: size,
-                              height: size,
-                              backgroundColor: stageColors[t.stage] ?? '#6b7280',
-                              border: '2px solid rgba(5,5,5,.85)',
-                              boxShadow: isSel
-                                ? '0 0 0 3px rgba(255,59,48,.3), 0 0 18px rgba(255,59,48,.55)'
-                                : '0 0 0 1px rgba(255,255,255,.14), 0 2px 8px rgba(0,0,0,.6)',
-                              transform: isSel ? 'scale(1.3)' : undefined,
-                            }}
-                          />
-                          <span className="absolute text-[10px] font-bold text-white pointer-events-none"
-                            style={{ textShadow: '0 1px 2px rgba(0,0,0,.9)' }}>
-                            {i + 1}
-                          </span>
-                          <span
-                            className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] pointer-events-none ${isSel ? '' : 'hidden sm:block'}`}
-                            style={{
-                              top: 'calc(100% + 3px)',
-                              color: isSel ? '#fff' : 'rgba(255,255,255,.62)',
-                              fontWeight: isSel ? 700 : 400,
-                              textShadow: '0 1px 3px #050505, 0 0 6px #050505',
-                            }}
-                          >
-                            {t.city}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-x-3.5 gap-y-1.5 px-3.5 py-3 border-t border-white/10 text-[11px] text-white/40">
-                  {STAGES.filter(s => s !== '조별').map(s => (
-                    <span key={s} className="inline-flex items-center gap-1.5">
-                      <i className="rounded-full" style={{ width: 9, height: 9, backgroundColor: stageColors[s] }} />
-                      {s}
-                    </span>
-                  ))}
-                  <span className="inline-flex items-center gap-1.5">
-                    <i className="rounded-full bg-white" style={{ width: 9, height: 9 }} />홈
-                  </span>
-                  <span>원 크기 = 경기 수</span>
-                </div>
+              <section className="satellite-map-panel" aria-label="대회 개최 도시">
+                <TournamentSatelliteMap points={visible} selectedId={selectedId} showRoute={showRoute}
+                  onSelect={id => { setSelectedId(id); setExpandedId(null); }} />
               </section>
-
               {/* 상세 + 타임라인 */}
-              <aside className="border border-white/10" style={{ backgroundColor: '#0f1012' }}>
+              <aside className="satellite-details">
                 {selected ? (
                   <>
-                    <div className="p-4 sm:p-5 border-b border-white/10">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h2 className="text-white font-black text-lg sm:text-xl leading-snug">{selected.name}</h2>
-                          <p className="text-white/40 text-[12.5px] mt-1.5">
-                            <span className="text-white/70">{selected.city}</span>
-                            {selected.venue && ` · ${selected.venue}`}
-                            <br />
-                            {formatRange(selected.from, selected.to)} · {HOME.city}에서{' '}
-                            {Math.round(distanceKm(HOME, selected)).toLocaleString('ko-KR')}km
-                          </p>
+                    <section className="tournament-spotlight" style={{'--achievement':stageColors[selected.stage]} as React.CSSProperties} aria-label="선택한 대회">
+                      <div className="spotlight-hero">
+                        <div className="spotlight-topline"><span>{selected.from.slice(0,4)} SEASON</span><span>대회 기록</span></div>
+                        <div className="spotlight-award"><ClubIcon name={selected.stage==='우승'?'cup':selected.stage==='준우승'?'medal':'shield'} /><strong>{selected.stage}</strong></div>
+                        <div className="spotlight-location"><ClubIcon name="pin" />{selected.city}</div>
+                        <h2>{selected.name}</h2>
+                        <div className="spotlight-date"><ClubIcon name="calendar" />{formatRange(selected.from,selected.to)}</div>
+                      </div>
+                      <div className="spotlight-body">
+                        <div className="spotlight-venue"><ClubIcon name="pin" /><span>{selected.venue || '경기장 미등록'}</span><span className="spotlight-distance">{HOME.city}에서 {Math.round(distanceKm(HOME,selected))} km</span></div>
+                        {selectedMatches.length ? <>
+                          <div className="spotlight-scoreboard" aria-label="대회 전적">
+                            <div className="record-win"><strong>{selectedRecord.w}</strong><span>승리</span></div>
+                            <div><strong>{selectedRecord.d}</strong><span>무승부</span></div>
+                            <div className="record-loss"><strong>{selectedRecord.l}</strong><span>패배</span></div>
+                          </div>
+                          <div className="spotlight-goals"><span>득점 <b>{selectedRecord.gf}</b></span><span>실점 <b>{selectedRecord.ga}</b></span><span>득실 <b>{selectedRecord.gf-selectedRecord.ga>0?'+':''}{selectedRecord.gf-selectedRecord.ga}</b></span></div>
+                        </> : <p className="spotlight-empty">경기를 연결하면 전적이 표시됩니다.</p>}
+                        <div className="spotlight-actions">
+                          <button onClick={()=>requireAdmin(()=>openLink(selected))}><ClubIcon name="ball"/>경기 연결</button>
+                          <button onClick={()=>requireAdmin(()=>openEdit(selected),{reconfirm:true})}><ClubIcon name="edit"/>수정</button>
+                          <button onClick={()=>requireAdmin(()=>setDeleteId(selected.id),{reconfirm:true})}><ClubIcon name="trash"/>삭제</button>
                         </div>
-                        <span
-                          className="flex-none font-black text-[15px] px-2.5 py-1.5 border"
-                          style={{ color: stageColors[selected.stage], borderColor: stageColors[selected.stage] }}
-                        >
-                          {selected.stage}
-                        </span>
                       </div>
-
-                      {selectedMatches.length > 0 && (
-                        <>
-                          <div className="flex h-1.5 mt-4 overflow-hidden" style={{ backgroundColor: '#000' }}>
-                            {(['승', '무', '패'] as const).map(k => {
-                              const n = k === '승' ? selectedRecord.w : k === '무' ? selectedRecord.d : selectedRecord.l;
-                              return n ? <i key={k} style={{ flex: n, backgroundColor: resultColors[k] }} /> : null;
-                            })}
-                          </div>
-                          <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-2 text-xs text-white/40">
-                            <span>
-                              <b className="font-black text-base" style={{ color: resultColors['승'] }}>{selectedRecord.w}</b>승{' '}
-                              <b className="font-black text-base" style={{ color: resultColors['무'] }}>{selectedRecord.d}</b>무{' '}
-                              <b className="font-black text-base" style={{ color: resultColors['패'] }}>{selectedRecord.l}</b>패
-                            </span>
-                            <span>
-                              득점 <b className="text-white/70">{selectedRecord.gf}</b> · 실점{' '}
-                              <b className="text-white/70">{selectedRecord.ga}</b> · 득실{' '}
-                              <b className="text-white/70">
-                                {selectedRecord.gf - selectedRecord.ga > 0 ? '+' : ''}
-                                {selectedRecord.gf - selectedRecord.ga}
-                              </b>
-                            </span>
-                          </div>
-                        </>
-                      )}
-
-                      <div className="flex flex-wrap gap-2 mt-4">
-                        <button
-                          onClick={() => requireAdmin(() => openLink(selected))}
-                          className="px-3 py-1.5 text-xs font-bold text-white border transition-colors"
-                          style={{ borderColor: 'rgba(204,0,0,0.6)', color: '#ff8b84' }}
-                        >
-                          ⚽ 경기 연결
-                        </button>
-                        <button
-                          onClick={() => requireAdmin(() => openEdit(selected), { reconfirm: true })}
-                          className="px-3 py-1.5 text-xs font-bold text-white/60 border border-white/20 hover:border-white/40 transition-colors"
-                        >
-                          수정
-                        </button>
-                        <button
-                          onClick={() => requireAdmin(() => setDeleteId(selected.id), { reconfirm: true })}
-                          className="px-3 py-1.5 text-xs font-bold border border-white/20 hover:border-red-500 transition-colors"
-                          style={{ color: '#dc2626' }}
-                        >
-                          삭제
-                        </button>
-                      </div>
-                    </div>
-
+                    </section>
                   </>
                 ) : (
                   <div className="p-8 text-center text-white/40 text-sm">
@@ -669,19 +515,21 @@ export default function MapPage() {
                   </div>
                 )}
 
-                <div className="p-4 sm:p-5 border-t border-white/10">
+                <div className="satellite-history">
+                  <div className="history-heading">
                   <h3 className="text-white/40 text-[11px] tracking-widest font-bold mb-3">
                     전체 대회 <span className="text-white/20">({visible.length})</span>
                   </h3>
-                  <ol className="grid gap-px max-h-[560px] overflow-y-auto">
-                    {[...visible].reverse().map(t => {
+                  <select aria-label="대회 정렬" value={sortOrder} onChange={e => setSortOrder(e.target.value)}><option value="latest">최신순</option><option value="oldest">오래된순</option></select>
+                  </div>
+                  <ol className="grid gap-px">
+                    {[...visible].sort((a,b) => sortOrder === 'latest' ? b.from.localeCompare(a.from) : a.from.localeCompare(b.from)).map((t,index) => {
                       const games = matchesByTournament.get(t.id) ?? [];
                       const rec = recordOf(games);
                       const isSel = t.id === selectedId;
                       const isOpen = t.id === expandedId;
-                      const no = visible.indexOf(t) + 1;   // 지도 위 번호와 같다
                       return (
-                        <li key={t.id}>
+                        <li key={t.id} className={isSel ? 'selected-tournament' : ''} style={{ '--stage-color':stageColors[t.stage] } as React.CSSProperties}>
                           <button
                             onClick={e => {
                               const el = e.currentTarget;
@@ -696,22 +544,13 @@ export default function MapPage() {
                             aria-pressed={isSel}
                             className="w-full text-left px-3 py-2.5 grid grid-cols-[1fr_auto] gap-x-3 items-center transition-colors"
                             style={{
-                              backgroundColor: isSel ? '#23191a' : '#161719',
-                              borderLeft: `3px solid ${isSel ? '#CC0000' : 'transparent'}`,
+                              backgroundColor: isSel ? 'rgba(255,255,255,.045)' : 'transparent',
+                              borderLeft: `2px solid ${isSel ? stageColors[t.stage] : 'transparent'}`,
                             }}
                           >
-                            <span className="text-[13.5px] text-white/90 break-words min-w-0">
-                              <span aria-hidden="true" className="inline-block w-3 text-white/35 mr-0.5">
-                                {isOpen ? '▾' : '▸'}
-                              </span>
-                              <span
-                                className="inline-grid place-items-center align-[-2px] mr-1.5 text-[10px] font-bold text-white rounded-full"
-                                style={{ width: 17, height: 17, backgroundColor: stageColors[t.stage] ?? '#6b7280', border: '1.5px solid rgba(5,5,5,.85)' }}
-                                aria-label={`지도 ${no}번`}
-                              >
-                                {no}
-                              </span>
-                              {t.name}
+                            <span className="map-entry-title text-white/90 min-w-0">
+                              <b className="map-entry-index" aria-hidden="true">{String(index+1).padStart(2,'0')}</b>
+                              <span className="map-entry-name">{t.name}</span>
                             </span>
                             <span className="row-span-2 text-right">
                               <span className="block text-xs font-bold" style={{ color: stageColors[t.stage] }}>
@@ -721,14 +560,14 @@ export default function MapPage() {
                                 {rec.w}-{rec.d}-{rec.l}
                               </span>
                             </span>
-                            <span className="col-start-1 text-[11.5px] text-white/40">
-                              {formatRange(t.from, t.to)} · {t.city}
+                            <span className="map-entry-meta col-start-1 text-white/40">
+                              <span>{t.city}</span><span>{formatRange(t.from, t.to)}</span>
                             </span>
                           </button>
 
                           {isOpen && (
                             <div className="px-3 pt-1 pb-3"
-                              style={{ backgroundColor: '#23191a', borderLeft: '3px solid #CC0000' }}>
+                              style={{ backgroundColor: 'rgba(255,255,255,.015)', borderLeft: `2px solid ${stageColors[t.stage]}` }}>
                               {games.length ? (
                                 <table className="w-full text-[13px]">
                                   <tbody>
